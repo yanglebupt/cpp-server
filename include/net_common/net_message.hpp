@@ -45,11 +45,30 @@ namespace net
       header = other.header;
       body = other.body;
     }
+    message<T> &operator=(const message<T> &other)
+    {
+      if (&other != this)
+      {
+        header = other.header;
+        body = other.body;
+      }
+      return *this;
+    }
     message(message<T> &&other)
     {
       header = other.header;
-      body = std::move(other.body);
       other.header.size = 0;
+      body = std::move(other.body);
+    }
+    message<T> &operator=(message<T> &&other)
+    {
+      if (&other != this)
+      {
+        header = other.header;
+        other.header.size = 0;
+        body = std::move(other.body);
+      }
+      return *this;
     }
 
     // 返回整个消息包体的 bytes
@@ -120,27 +139,53 @@ namespace net
     }
   };
 
-  // Forward declarations only for pointer, 因为指针类型分配的大小的确定的
-  template <typename T>
-  class connection;
-
   /**
    * 携带消息的主体：谁发来的消息
    */
-  template <typename T>
+  template <typename T, typename Connection>
   struct owned_message
   {
     /**
      * 消息发送者指针
      */
-    std::shared_ptr<connection<T>> remote = nullptr;
+    std::shared_ptr<Connection> remote = nullptr;
     /**
      * 发送的消息
      */
     message<T> msg;
 
+    owned_message() {};
+    owned_message(const owned_message<T, Connection> &other)
+    {
+      remote = other.remote;
+      msg = other.msg;
+    }
+    owned_message<T, Connection> &operator=(const owned_message<T, Connection> &other)
+    {
+      if (&other != this)
+      {
+        remote = other.remote;
+        msg = other.msg;
+      }
+      return *this;
+    }
+    owned_message(owned_message<T, Connection> &&other)
+    {
+      remote = std::move(other.remote);
+      msg = std::move(other.msg);
+    }
+    owned_message<T, Connection> &operator=(owned_message<T, Connection> &&other)
+    {
+      if (&other != this)
+      {
+        remote = std::move(other.remote);
+        msg = std::move(other.msg);
+      }
+      return *this;
+    }
+
     // print
-    friend std::ostream &operator<<(std::ostream &os, const owned_message<T> &msg)
+    friend std::ostream &operator<<(std::ostream &os, const owned_message<T, Connection> &msg)
     {
       os << msg.msg;
       return os;

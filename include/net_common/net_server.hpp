@@ -1,8 +1,7 @@
 #pragma once
 
-#include "net_tsqueue.hpp"
-#include "net_connection.hpp"
-#include "net_message.hpp"
+#include "net_logic_systerm.hpp"
+#include "net_server_connection.hpp"
 #include <iostream>
 
 namespace net
@@ -11,7 +10,8 @@ namespace net
   class server_interface
   {
   public:
-    server_interface(std::uint16_t port) : m_acceptor(ctx, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)) {}
+    server_interface(std::uint16_t port) : m_acceptor(ctx, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)) {};
+
     virtual ~server_interface()
     {
       Stop();
@@ -24,8 +24,11 @@ namespace net
 
     bool Start()
     {
+      bool no_error = true;
       try
       {
+        asio::io_context::work idleWork(ctx);
+
         // 一直循环监听
         WaitForClientConnection();
 
@@ -33,14 +36,26 @@ namespace net
                                  { ctx.run(); });
 
         std::cout << "[SERVER] Started!" << std::endl;
-        return true;
+        no_error = true;
       }
       catch (const std::exception &e)
       {
         std::cerr << "[SERVER] Exception: " << e.what() << std::endl;
-        return false;
+        no_error = false;
       }
+
+      // if (no_error)
+      //   this->StartHandle();
+
+      return no_error;
     }
+
+    // virtual void Join() override
+    // {
+    //   // if (ctx_thread.joinable())
+    //   //   ctx_thread.join();
+    //   logic_system<T, server_connection<T>>::Join();
+    // }
 
     void WaitForClientConnection()
     {
@@ -52,7 +67,8 @@ namespace net
         {
           std::cout << "[SERVER] New Connection: " << socket.remote_endpoint() << std::endl;
           // 这个 client 需要保留下来，后面服务器响应的时候要用到
-          std::shared_ptr<connection<T>> client = std::make_shared<connection<T>>(connection<T>::owner::server, ctx, std::move(socket), message_in_dq);
+          std::shared_ptr<server_connection<T>>
+              client = std::make_shared<server_connection<T>>(nullptr, ctx, std::move(socket), message_in_dq);
 
           // 由具体的业务服务，确定该请求是否接收
           isAccepted = OnClientConnect(client);
@@ -64,7 +80,8 @@ namespace net
 
             // 背后添加一个异步任务，io_context 是在一个子线程中允许全部的异步任务吗，执行顺序是和添加顺序一致吗？
             // 在一个异步任务的结束时添加异步任务，添加的异步任务会立刻执行，还是在重新调度？
-            m_connections_dq.back()->ConnectToClient(this, nIDCounter++);
+            m_connections_dq.back()->ConnectToClient(nIDCounter++);
+            std::cout << "End" << nIDCounter << std::endl;
           }
         }
 
@@ -72,6 +89,8 @@ namespace net
         {
           std::cout << "[-----] Connection Denied" << std::endl;
         }
+
+        std::cout << "Keep acc"  << std::endl;
 
         // 循环监听
         WaitForClientConnection(); });
@@ -85,7 +104,14 @@ namespace net
       std::cout << "[SERVER] Stop!" << std::endl;
     }
 
-    void SendMessageClient(std::shared_ptr<connection<T>> &client, const message<T> &msg)
+    void Update()
+    {
+      // this->message_in_dq.wait();
+      // auto msg = this->message_in_dq.pop_front();
+      // OnMessage(msg.remote, msg.msg);
+    }
+
+    void SendMessageClient(std::shared_ptr<server_connection<T>> &client, message<T> &msg)
     {
       if (client->IsConnected())
       {
@@ -103,7 +129,7 @@ namespace net
       }
     }
 
-    void SendMessageAllClients(const message<T> msg, std::shared_ptr<connection<T>> &ignoreClient = nullptr)
+    void SendMessageAllClients(message<T> &msg, std::shared_ptr<server_connection<T>> &ignoreClient = nullptr)
     {
       bool removeInvalid = false;
       for (auto &client : m_connections_dq)
@@ -126,45 +152,38 @@ namespace net
         m_connections_dq.erase(std::remove(m_connections_dq.begin(), m_connections_dq.end(), nullptr), m_connections_dq.end());
     }
 
-    void Update()
-    {
-      message_in_dq.wait();
-      auto msg = message_in_dq.pop_front();
-      // net_connection 的 AddTempMsgToQueue 里面通过共享智能指针引用加一保存了 remote client
-      OnMessage(msg.remote, msg.msg);
-    }
-
     /*--------------- 一些回调函数，不同的业务服务，可以有不同的回调函数 ----------------*/
   public:
     // 客户端通过验证
-    virtual void OnClientValidated(std::shared_ptr<connection<T>> client)
+    virtual void OnClientValidated(std::shared_ptr<server_connection<T>> client)
     {
     }
 
   protected:
     // 决定是否建立连接
-    virtual bool OnClientConnect(std::shared_ptr<connection<T>> client)
+    virtual bool OnClientConnect(std::shared_ptr<server_connection<T>> client)
     {
       return true;
     }
 
     // 是否连接
-    virtual void OnClientDisConnect(std::shared_ptr<connection<T>> client)
+    virtual void OnClientDisConnect(std::shared_ptr<server_connection<T>> client)
     {
     }
 
     // 接收到客户端消息包
-    virtual void OnMessage(std::shared_ptr<connection<T>> client, const message<T> &msg)
-    {
-    }
+    // virtual void OnMessage(std::shared_ptr<server_connection<T>> client, message<T> &msg) override
+    // {
+    // }
 
     asio::io_context ctx;
     std::thread ctx_thread;
     asio::ip::tcp::acceptor m_acceptor;
     // Container of active validated connections
-    std::deque<std::shared_ptr<connection<T>>> m_connections_dq;
+    std::deque<std::shared_ptr<server_connection<T>>> m_connections_dq;
 
-    tsqueue<owned_message<T>> message_in_dq;
+    // incoming messages from remote
+    tsqueue<owned_message<T, server_connection<T>>> message_in_dq;
 
     // Clients will be identified in the "wider system" via an ID
     uint32_t nIDCounter = 10000;

@@ -23,35 +23,59 @@ namespace net
   public:
     tsqueue() = default;
     tsqueue(const tsqueue &) = delete;
+
+    void free()
+    {
+      clear();
+      std::deque<T>().swap(dq);
+      cond.notify_all();
+    }
+
     ~tsqueue()
     {
-      dq.clear();
-      std::deque<T>().swap(dq);
+      free();
     };
 
-    const T &front()
+    // 返回不能用 std::move，后面右值是无法取地址的
+    // 但是由于添加的时候是 std::move 添加右值的
+    T front()
     {
       std::lock_guard<std::mutex> lock(_mutex);
       return dq.front();
     }
 
-    const T &back()
+    T back()
     {
       std::lock_guard<std::mutex> lock(_mutex);
       return dq.back();
     }
 
-    void emplace_back(const T &item)
+    // 注意参数不要 const T item，const 无法移动，仍然调用拷贝构造函数
+    void emplace_back(T &item)
     {
       std::lock_guard<std::mutex> lock(_mutex);
       dq.emplace_back(std::move(item));
       cond.notify_all();
     }
 
-    void emplace_front(const T &item)
+    void emplace_back(T &&item)
+    {
+      std::lock_guard<std::mutex> lock(_mutex);
+      dq.emplace_back(item);
+      cond.notify_all();
+    }
+
+    void emplace_front(T &item)
     {
       std::lock_guard<std::mutex> lock(_mutex);
       dq.emplace_front(std::move(item));
+      cond.notify_all();
+    }
+
+    void emplace_front(T &&item)
+    {
+      std::lock_guard<std::mutex> lock(_mutex);
+      dq.emplace_front(item);
       cond.notify_all();
     }
 
@@ -85,17 +109,17 @@ namespace net
     T pop_front()
     {
       std::lock_guard<std::mutex> lock(_mutex);
-      auto t = std::move(dq.front());
+      auto v = dq.front();
       dq.pop_front();
-      return t;
+      return v;
     }
 
     T pop_back()
     {
       std::lock_guard<std::mutex> lock(_mutex);
-      auto t = std::move(dq.back());
+      auto v = dq.back();
       dq.pop_back();
-      return t;
+      return v;
     }
   };
 }

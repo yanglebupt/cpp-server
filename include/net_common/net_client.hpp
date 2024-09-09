@@ -3,8 +3,7 @@
 #include "asio.hpp"
 #include "net_message.hpp"
 #include "net_tsqueue.hpp"
-#include "net_connection.hpp"
-#include "net_server.hpp"
+#include "net_client_connection.hpp"
 #include <thread>
 #include <memory>
 #include <iostream>
@@ -32,7 +31,7 @@ namespace net
         asio::ip::tcp::resolver::results_type endpoints = resolver.resolve(host, std::to_string(port));
 
         // 创建连接
-        m_connection = std::make_unique<connection<T>>(connection<T>::owner::client, ctx, asio::ip::tcp::socket(ctx), message_in_dq);
+        m_connection = std::make_unique<client_connection<T>>(ctx, asio::ip::tcp::socket(ctx), message_in_dq);
         m_connection->ConnectToServer(endpoints);
 
         // 开始异步操作
@@ -51,9 +50,7 @@ namespace net
     void DisConnect()
     {
       if (IsConnected())
-      {
         m_connection->DisConnect();
-      }
 
       ctx.stop();
       if (ctx_thread.joinable())
@@ -70,13 +67,14 @@ namespace net
         return false;
     }
 
-    void Send(const message<T> &msg)
+    // 只进行一次拷贝，不影响外面的消息，当然外面可以 std::move 传参进来
+    void Send(message<T> msg)
     {
       if (IsConnected())
         m_connection->Send(msg);
     }
 
-    tsqueue<owned_message<T>> &InComing()
+    tsqueue<owned_message<T, client_connection<T>>> &InComing()
     {
       return message_in_dq;
     }
@@ -84,11 +82,11 @@ namespace net
   protected:
     asio::io_context ctx;
     std::thread ctx_thread;
-    std::unique_ptr<connection<T>> m_connection;
+    std::unique_ptr<client_connection<T>> m_connection;
 
   private:
     // incoming message queue from server, and client need handle message in this queue
-    tsqueue<owned_message<T>> message_in_dq;
+    tsqueue<owned_message<T, client_connection<T>>> message_in_dq;
   };
 
 }

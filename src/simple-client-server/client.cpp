@@ -47,7 +47,7 @@ int main()
   std::cout << "Press 3: Exit" << std::endl;
 
   int command = 0;
-  int exit = false;
+  bool exit = false;
 
   std::thread t([&]()
                 {while (!exit)

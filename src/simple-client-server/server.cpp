@@ -21,7 +21,7 @@ public:
   CustomServer(uint16_t port) : net::server_interface<CustomMsgType>(port) {}
 
 protected:
-  virtual bool OnClientConnect(std::shared_ptr<net::connection<CustomMsgType>> client)
+  virtual bool OnClientConnect(std::shared_ptr<net::server_connection<CustomMsgType>> client)
   {
     net::message<CustomMsgType> msg;
     msg.header.id = CustomMsgType::ServerAccept;
@@ -29,45 +29,46 @@ protected:
     return true;
   }
 
-  virtual void OnClientValidated(std::shared_ptr<net::connection<CustomMsgType>> client)
+  virtual void OnClientValidated(std::shared_ptr<net::server_connection<CustomMsgType>> client)
   {
     net::message<CustomMsgType> msg;
     msg.header.id = CustomMsgType::ServerValidated;
     client->Send(msg);
   }
 
-  virtual void OnClientDisConnect(std::shared_ptr<net::connection<CustomMsgType>> client)
+  virtual void OnClientDisConnect(std::shared_ptr<net::server_connection<CustomMsgType>> client)
   {
     std::cout << "Removing client [" << client->GetID() << "], Remain client count: " << ClientCount() << std::endl;
   }
 
-  virtual void OnMessage(std::shared_ptr<net::connection<CustomMsgType>> client, const net::message<CustomMsgType> &msg)
-  {
-    switch (msg.header.id)
-    {
-    case CustomMsgType::ServerPing:
-    {
-      std::cout << "[" << client->GetID() << "]" << "Server ping" << std::endl;
-      client->Send(msg);
-      break;
-    }
-    case CustomMsgType::MessageAll:
-    {
-      std::cout << "[" << client->GetID() << "]" << "MessageAll" << std::endl;
-      net::message<CustomMsgType> msg;
-      msg.header.id = CustomMsgType::ServerMessage;
-      msg << client->GetID();
-      SendMessageAllClients(msg, client);
-      break;
-    }
-    }
-  }
+  // virtual void OnMessage(std::shared_ptr<net::server_connection<CustomMsgType>> client, net::message<CustomMsgType> &msg)
+  // {
+  //   switch (msg.header.id)
+  //   {
+  //   case CustomMsgType::ServerPing:
+  //   {
+  //     std::cout << "[" << client->GetID() << "]" << "Server ping" << std::endl;
+  //     client->Send(msg);
+  //     break;
+  //   }
+  //   case CustomMsgType::MessageAll:
+  //   {
+  //     std::cout << "[" << client->GetID() << "]" << "MessageAll" << std::endl;
+  //     net::message<CustomMsgType> msg;
+  //     msg.header.id = CustomMsgType::ServerMessage;
+  //     msg << client->GetID();
+  //     SendMessageAllClients(msg, client);
+  //     break;
+  //   }
+  //   }
+  // }
 };
 
 int main()
 {
   CustomServer server(5050);
   server.Start();
+  // server.Join();
 
   while (true)
   {
