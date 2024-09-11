@@ -51,19 +51,21 @@ namespace net
 
     void WriteHeader()
     {
-      auto message = message_out_dq.front();
-      asio::async_write(socket, asio::buffer(&message.header, sizeof(message_header<T>)), [this, &message](std::error_code ec, std::size_t length)
+      // 这里不能使用局部变量，局部变量在异步可能释放，但是这里会出现频繁取第一个元素，导致多次拷贝
+      // 由于这里只涉及读，不存在竞争问题，因此队列返回引用即可
+      // 写要保证顺序，能迁移到多线程写吗？比如一个线程写第一个，另一个线程写第二个，如果第一个写失败了咋办，第二个已经发出去了？
+      asio::async_write(socket, asio::buffer(&message_out_dq.front().header, sizeof(message_header<T>)), [this](std::error_code ec, std::size_t length)
                         {
         if (!ec) {
-          if (message.body.size() > 0)
+          if (message_out_dq.front().body.size() > 0)
           {
             // 有 body
-            WriteBody(message);
+            WriteBody();
           }
           else
           {
             // 无 body，写完毕
-            message_out_dq.pop_front();
+            message_out_dq.remove_front();
             if (!message_out_dq.empty()) WriteHeader();
           }
         } else {
@@ -72,12 +74,12 @@ namespace net
         } });
     };
 
-    void WriteBody(message<T> &message)
+    void WriteBody()
     {
-      asio::async_write(socket, asio::buffer(message.body.data(), message.body.size()), [this](std::error_code ec, std::size_t length)
+      asio::async_write(socket, asio::buffer(message_out_dq.front().body.data(), message_out_dq.front().body.size()), [this](std::error_code ec, std::size_t length)
                         {
         if (!ec) {
-          message_out_dq.pop_front();
+          message_out_dq.remove_front();
           if (!message_out_dq.empty())
             WriteHeader();
         } else {
@@ -88,20 +90,21 @@ namespace net
 
     void ReadHeader()
     {
-      message<T> message;
-      asio::async_read(socket, asio::buffer(&message.header, sizeof(message_header<T>)), [this, &message](std::error_code ec, std::size_t length)
+      // 这里涉及到写了，后面迁移多线程可能存在数据竞争，因此每次写都需要在线程的局部变量上写
+      message<T> *msg = new message<T>();
+      asio::async_read(socket, asio::buffer(&msg->header, sizeof(message_header<T>)), [this, msg](std::error_code ec, std::size_t length)
                        {
         if (!ec) {
-          if (message.header.size > 0)
+          if (msg->header.size > 0)
           {
             // 有 body
-            message.body.resize(message.header.size);
-            ReadBody(message);
+            msg->body.resize(msg->header.size);
+            ReadBody(msg);
           }
           else
           {
             // 无 body
-            PushMessageToQueue(message);
+            PushMessageToQueue(msg);
           }
         } else {
           std::cout << "[" << id << "] Read Header Failed" << std::endl;
@@ -110,24 +113,25 @@ namespace net
         } });
     };
 
-    void ReadBody(message<T> &message)
+    void ReadBody(message<T> *msg)
     {
-      asio::async_read(socket, asio::buffer(message.body.data(), message.body.size()), [this, &message](std::error_code ec, std::size_t length)
+      asio::async_read(socket, asio::buffer(msg->body.data(), msg->body.size()), [this, msg](std::error_code ec, std::size_t length)
                        {
         if (!ec) {
-          PushMessageToQueue(message);
+          PushMessageToQueue(msg);
         } else {
           std::cout << "[" << id << "] Read Body Failed" << std::endl;
           socket.close();
         } });
     };
 
-    virtual owned_message<T, Connection> PackMessage(message<T> &message) = 0;
+    virtual owned_message<T, Connection> PackMessage(message<T> *msg) = 0;
 
     // 一个完整报文读取完毕
-    void PushMessageToQueue(message<T> &message)
+    void PushMessageToQueue(message<T> *msg)
     {
-      message_in_dq.emplace_back(PackMessage(message));
+      message_in_dq.emplace_back(PackMessage(msg)); // 将亡值，直接走 move
+      delete msg;
       // 继续读
       ReadHeader();
     };
@@ -142,18 +146,19 @@ namespace net
 
     uint32_t GetID() const { return id; }
 
-    void Send(message<T> &msg)
+    void Send(const message<T> &msg)
     {
-      // 引用不是 const
-      asio::post(ctx, [this, &msg]()
+      // 由于这里是异步，因此需要 copy，否则在异步回调执行中就拿不到引用了，如果外面不需要用了，这里可以 move
+      // 当然你可以去写重载函数
+      asio::post(ctx, [this, msg = std::move(const_cast<message<T> &>(msg))]() mutable
                  {
-                  bool isIdle = message_out_dq.empty();
-                  // 往 out mesaage queue 添加要发送的消息
-                  message_out_dq.emplace_back(msg);
-                  // 如果在添加消息之前，队列为空，说明此时是空闲的，因此需要唤起任务
-                  // 否则，发送消息的任务已经启动了，不需要再次启动
-                  if (isIdle)
-                    WriteHeader(); });
+                   bool isIdle = message_out_dq.empty();
+                   // 往 out mesaage queue 添加要发送的消息，注意这里的 msg 是右值引用（左值），需要用 std::move 变成右值
+                   message_out_dq.emplace_back(std::move(msg));
+                   // 如果在添加消息之前，队列为空，说明此时是空闲的，因此需要唤起任务
+                   // 否则，发送消息的任务已经启动了，不需要再次启动
+                   if (isIdle)
+                     WriteHeader(); });
     };
 
     void DisConnect()

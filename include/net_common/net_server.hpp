@@ -7,7 +7,7 @@
 namespace net
 {
   template <typename T>
-  class server_interface
+  class server_interface : logic_system<T, server_connection<T>>
   {
   public:
     server_interface(std::uint16_t port) : m_acceptor(ctx, asio::ip::tcp::endpoint(asio::ip::tcp::v4(), port)) {};
@@ -27,8 +27,6 @@ namespace net
       bool no_error = true;
       try
       {
-        asio::io_context::work idleWork(ctx);
-
         // 一直循环监听
         WaitForClientConnection();
 
@@ -44,18 +42,18 @@ namespace net
         no_error = false;
       }
 
-      // if (no_error)
-      //   this->StartHandle();
+      if (no_error)
+        this->StartHandleMessages();
 
       return no_error;
     }
 
-    // virtual void Join() override
-    // {
-    //   // if (ctx_thread.joinable())
-    //   //   ctx_thread.join();
-    //   logic_system<T, server_connection<T>>::Join();
-    // }
+    virtual void Join() override
+    {
+      if (ctx_thread.joinable())
+        ctx_thread.join();
+      logic_system<T, server_connection<T>>::Join();
+    }
 
     void WaitForClientConnection()
     {
@@ -68,20 +66,18 @@ namespace net
           std::cout << "[SERVER] New Connection: " << socket.remote_endpoint() << std::endl;
           // 这个 client 需要保留下来，后面服务器响应的时候要用到
           std::shared_ptr<server_connection<T>>
-              client = std::make_shared<server_connection<T>>(nullptr, ctx, std::move(socket), message_in_dq);
+              client = std::make_shared<server_connection<T>>(this, ctx, std::move(socket), this->InComing());
 
           // 由具体的业务服务，确定该请求是否接收
           isAccepted = OnClientConnect(client);
           if (isAccepted)
           {
-            // 注意一定要调用 std::move，不能 copy
-            m_connections_dq.emplace_back(std::move(client));
+            m_connections_dq.emplace_back(client);
             std::cout << "[-----] Connection Approved" << std::endl;
 
             // 背后添加一个异步任务，io_context 是在一个子线程中允许全部的异步任务吗，执行顺序是和添加顺序一致吗？
             // 在一个异步任务的结束时添加异步任务，添加的异步任务会立刻执行，还是在重新调度？
-            m_connections_dq.back()->ConnectToClient(nIDCounter++);
-            std::cout << "End" << nIDCounter << std::endl;
+            client->ConnectToClient(nIDCounter++);
           }
         }
 
@@ -89,8 +85,6 @@ namespace net
         {
           std::cout << "[-----] Connection Denied" << std::endl;
         }
-
-        std::cout << "Keep acc"  << std::endl;
 
         // 循环监听
         WaitForClientConnection(); });
@@ -104,14 +98,8 @@ namespace net
       std::cout << "[SERVER] Stop!" << std::endl;
     }
 
-    void Update()
-    {
-      // this->message_in_dq.wait();
-      // auto msg = this->message_in_dq.pop_front();
-      // OnMessage(msg.remote, msg.msg);
-    }
-
-    void SendMessageClient(std::shared_ptr<server_connection<T>> &client, message<T> &msg)
+    /*--------------- 发送消息，注意不要自己手动调 client->Send(msg) ，必须先判断是否掉线了 ----------------*/
+    void SendMessageClient(std::shared_ptr<server_connection<T>> &client, const message<T> &msg)
     {
       if (client->IsConnected())
       {
@@ -129,7 +117,7 @@ namespace net
       }
     }
 
-    void SendMessageAllClients(message<T> &msg, std::shared_ptr<server_connection<T>> &ignoreClient = nullptr)
+    void SendMessageAllClients(const message<T> &msg, std::shared_ptr<server_connection<T>> &ignoreClient)
     {
       bool removeInvalid = false;
       for (auto &client : m_connections_dq)
@@ -172,18 +160,13 @@ namespace net
     }
 
     // 接收到客户端消息包
-    // virtual void OnMessage(std::shared_ptr<server_connection<T>> client, message<T> &msg) override
-    // {
-    // }
+    virtual void OnMessage(std::shared_ptr<server_connection<T>> client, const message<T> &msg) = 0;
 
     asio::io_context ctx;
     std::thread ctx_thread;
     asio::ip::tcp::acceptor m_acceptor;
     // Container of active validated connections
     std::deque<std::shared_ptr<server_connection<T>>> m_connections_dq;
-
-    // incoming messages from remote
-    tsqueue<owned_message<T, server_connection<T>>> message_in_dq;
 
     // Clients will be identified in the "wider system" via an ID
     uint32_t nIDCounter = 10000;

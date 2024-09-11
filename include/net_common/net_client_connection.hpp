@@ -37,13 +37,12 @@ namespace net
           } });
     };
 
-    owned_message<T, client_connection<T>> PackMessage(message<T> &message) override
+    owned_message<T, client_connection<T>> PackMessage(message<T> *msg) override
     {
       owned_message<T, client_connection<T>> packed;
-      packed.remote = nullptr;
-      packed.msg = std::move(message);
+      packed.msg = std::move(*msg);
       // 返回值优化，可能不会拷贝
-      return std::move(packed);
+      return packed;
     };
 
   public:

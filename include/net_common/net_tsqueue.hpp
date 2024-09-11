@@ -36,43 +36,45 @@ namespace net
       free();
     };
 
-    // 返回不能用 std::move，后面右值是无法取地址的
-    // 但是由于添加的时候是 std::move 添加右值的
-    T front()
+    // 这里能返回引用吗？
+    T &front()
     {
       std::lock_guard<std::mutex> lock(_mutex);
       return dq.front();
     }
 
-    T back()
+    T &back()
     {
       std::lock_guard<std::mutex> lock(_mutex);
       return dq.back();
     }
 
-    // 注意参数不要 const T item，const 无法移动，仍然调用拷贝构造函数
-    void emplace_back(T &item)
+    // 如果这里是单纯的函数模板，可以使用万能引用和完美转发
+    // 但是这里是类里面的函数，并不符合万能引用的条件，因此需要手动创建两组参数
+    // 传入右值，移动
+    void emplace_back(T &&item)
     {
       std::lock_guard<std::mutex> lock(_mutex);
       dq.emplace_back(std::move(item));
       cond.notify_all();
     }
 
-    void emplace_back(T &&item)
-    {
-      std::lock_guard<std::mutex> lock(_mutex);
-      dq.emplace_back(item);
-      cond.notify_all();
-    }
-
-    void emplace_front(T &item)
+    void emplace_front(T &&item)
     {
       std::lock_guard<std::mutex> lock(_mutex);
       dq.emplace_front(std::move(item));
       cond.notify_all();
     }
 
-    void emplace_front(T &&item)
+    // 传入左值，拷贝
+    void emplace_back(const T &item)
+    {
+      std::lock_guard<std::mutex> lock(_mutex);
+      dq.emplace_back(item);
+      cond.notify_all();
+    }
+
+    void emplace_front(const T &item)
     {
       std::lock_guard<std::mutex> lock(_mutex);
       dq.emplace_front(item);
@@ -106,18 +108,31 @@ namespace net
       dq.clear();
     }
 
-    T pop_front()
+    void remove_front()
     {
       std::lock_guard<std::mutex> lock(_mutex);
-      auto v = dq.front();
+      dq.pop_front();
+    }
+
+    void remove_back()
+    {
+      std::lock_guard<std::mutex> lock(_mutex);
+      dq.pop_back();
+    }
+
+    // 这里能返回引用吗？
+    T &pop_front()
+    {
+      std::lock_guard<std::mutex> lock(_mutex);
+      T &v = dq.front();
       dq.pop_front();
       return v;
     }
 
-    T pop_back()
+    T &pop_back()
     {
       std::lock_guard<std::mutex> lock(_mutex);
-      auto v = dq.back();
+      T &v = dq.back();
       dq.pop_back();
       return v;
     }

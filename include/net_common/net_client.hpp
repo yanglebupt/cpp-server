@@ -67,8 +67,7 @@ namespace net
         return false;
     }
 
-    // 只进行一次拷贝，不影响外面的消息，当然外面可以 std::move 传参进来
-    void Send(message<T> msg)
+    void Send(const message<T> &msg)
     {
       if (IsConnected())
         m_connection->Send(msg);

@@ -28,70 +28,52 @@ namespace net
 
     void ReadValidation()
     {
-      std::cout << "Read" << std::endl;
-      asio::read(this->socket, asio::buffer(&response, sizeof(uint64_t)));
-      std::cout << "Read Done" << response << std::endl;
-
-      // asio::async_read(this->socket, asio::buffer(&response, sizeof(uint64_t)), [this](std::error_code ec, std::size_t length)
-      //                  {
-      //   if (!ec) {
-      //     if (response == exceptResponseValidation)
-      //     {
-      //       std::cout << "[" << this->id << "] Validation OK" << std::endl;
-      //       // server->OnClientValidated(this->share());
-      //       this->ReadHeader();
-      //     }
-      //     else
-      //     {
-      //       std::cout << "[" << this->id << "] Validation Failed, Close" << std::endl;
-      //       this->socket.close();
-      //     }
-      //   } else {
-      //     std::cout << "[" << this->id << "] Read Validation Failed" << std::endl;
-      //     this->socket.close();
-      //   } });
+      asio::async_read(this->socket, asio::buffer(&response, sizeof(uint64_t)), [this](std::error_code ec, std::size_t length)
+                       {
+        if (!ec) {
+          if (response == exceptResponseValidation)
+          {
+            std::cout << "[" << this->id << "] Validation OK" << std::endl;
+            server->OnClientValidated(this->share());
+            this->ReadHeader();
+          }
+          else
+          {
+            std::cout << "[" << this->id << "] Validation Failed, Close" << std::endl;
+            this->socket.close();
+          }
+        } else {
+          std::cout << "[" << this->id << "] Read Validation Failed" << std::endl;
+          this->socket.close();
+        } });
     }
 
     void WriteValidation()
     {
-      // std::cout << "Write Validation" << validation << std::endl;
-      // try
-      // {
-      //   asio::write(this->socket, asio::buffer(&validation, sizeof(uint64_t)));
-      //   std::cout << "Write Done" << std::endl;
-      // }
-      // catch (const std::exception &e)
-      // {
-      //   std::cerr << e.what() << '\n';
-      // }
-      // ReadValidation();
-
       asio::async_write(this->socket, asio::buffer(&validation, sizeof(uint64_t)), [this](std::error_code ec, std::size_t length)
                         {
-        std::cout << "Write Validation Done" << ec.message() <<validation << std::endl;
         if (!ec) {
-          std::cout << "Write Validation SUC" << validation << std::endl;
           // 等待客户端返回响应码，内部校验通过，开始读取 Header
-          // ReadValidation();
+          ReadValidation();
         } else {
           std::cout << "[" << this->id << "] Write Validation Failed" << std::endl;
           this->socket.close();
         } });
     }
 
-    owned_message<T, server_connection<T>> PackMessage(message<T> &message) override
+    owned_message<T, server_connection<T>> PackMessage(message<T> *msg) override
     {
       owned_message<T, server_connection<T>> packed;
-      // packed.remote = this->share();
-      packed.msg = std::move(message);
+      packed.remote = this->share();
+      packed.msg = std::move(*msg);
       // 返回值优化，可能不会拷贝
-      return std::move(packed);
+      return packed;
     };
 
-    // std::shared_ptr<server_connection<T>> share()
-    // {
-    //   return std::dynamic_pointer_cast<server_connection<T>>(this->shared_from_this());
-    // }
+    std::shared_ptr<server_connection<T>> share()
+    {
+      return std::dynamic_pointer_cast<server_connection<T>>(this->shared_from_this());
+    }
 
   public:
     server_connection(server_interface<T> *server, asio::io_context &ctx, asio::ip::tcp::socket socket, tsqueue<owned_message<T, server_connection<T>>> &qIn) : connection<T, server_connection<T>>(ctx, std::move(socket), qIn), server(server)

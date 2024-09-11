@@ -2,17 +2,8 @@
 #define _WIN32_WINNT 0x0A00
 #endif
 #include "net_common/net_client.hpp"
+#include "common.cpp"
 #include <iostream>
-
-enum class CustomMsgType : uint32_t
-{
-  ServerAccept,
-  ServerValidated,
-  ServerDeny,
-  ServerPing,
-  MessageAll,
-  ServerMessage,
-};
 
 class CustomClient : public net::client_interface<CustomMsgType>
 {
