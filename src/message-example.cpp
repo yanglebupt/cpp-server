@@ -7,7 +7,7 @@ enum class SystemMessage : uint32_t
   MovePlayer
 };
 
-int main()
+void rw()
 {
   net::message<SystemMessage> msg;
   msg.header.id = SystemMessage::MovePlayer;
@@ -47,6 +47,26 @@ int main()
   {
     std::cout << "d[" << i << +"]: " << d[i].x << "," << d[i].y << std::endl;
   }
+}
+
+void Send(const net::message<SystemMessage> &msg)
+{
+  auto func = [msg = std::move(const_cast<net::message<SystemMessage> &>(msg))]() mutable
+  {
+    uint32_t id;
+    msg >> id;
+    std::cout << "id: " << id << std::endl;
+  };
+  func();
+}
+
+int main()
+{
+  net::message<SystemMessage> msg;
+  msg.header.id = SystemMessage::MovePlayer;
+  msg << 1001;
+
+  Send(msg);
 
   return 0;
 }

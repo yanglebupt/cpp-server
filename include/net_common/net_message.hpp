@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstring>
 #include <memory>
+#include <iostream>
 
 namespace net
 {
@@ -75,6 +76,15 @@ namespace net
     size_t size() const
     {
       return body.size();
+    }
+
+    void print() const
+    {
+      for (const uint8_t &n : body)
+      {
+        std::cout << (int)n << ",";
+      }
+      std::cout << std::endl;
     }
 
     // print

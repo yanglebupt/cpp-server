@@ -152,13 +152,13 @@ namespace net
       // 当然你可以去写重载函数
       asio::post(ctx, [this, msg = std::move(const_cast<message<T> &>(msg))]() mutable
                  {
-                   bool isIdle = message_out_dq.empty();
-                   // 往 out mesaage queue 添加要发送的消息，注意这里的 msg 是右值引用（左值），需要用 std::move 变成右值
-                   message_out_dq.emplace_back(std::move(msg));
-                   // 如果在添加消息之前，队列为空，说明此时是空闲的，因此需要唤起任务
-                   // 否则，发送消息的任务已经启动了，不需要再次启动
-                   if (isIdle)
-                     WriteHeader(); });
+                  bool isIdle = message_out_dq.empty();
+                  // 往 out mesaage queue 添加要发送的消息，注意这里的 msg 是右值引用（左值），需要用 std::move 变成右值
+                  message_out_dq.emplace_back(std::move(msg));
+                  // 如果在添加消息之前，队列为空，说明此时是空闲的，因此需要唤起任务
+                  // 否则，发送消息的任务已经启动了，不需要再次启动
+                  if (isIdle)
+                    WriteHeader(); });
     };
 
     void DisConnect()

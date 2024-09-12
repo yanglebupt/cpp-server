@@ -120,19 +120,20 @@ namespace net
       dq.pop_back();
     }
 
-    // 这里能返回引用吗？
-    T &pop_front()
+    // 这里不能返回引用，pop 之后就没了，front 地址成了野指针，千万不能用，这属于未定义行为，不合法的
+    T pop_front()
     {
       std::lock_guard<std::mutex> lock(_mutex);
-      T &v = dq.front();
+      // 那取元素如何防止拷贝呢？这里不能引用
+      T v = dq.front();
       dq.pop_front();
       return v;
     }
 
-    T &pop_back()
+    T pop_back()
     {
       std::lock_guard<std::mutex> lock(_mutex);
-      T &v = dq.back();
+      T v = dq.back();
       dq.pop_back();
       return v;
     }

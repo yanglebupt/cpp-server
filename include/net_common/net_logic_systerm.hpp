@@ -23,6 +23,7 @@ namespace net
       while (true)
       {
         message_in_dq.wait();
+        // 将亡值 move 延长生命周期
         owned_message<T, Connection> msg = message_in_dq.pop_front();
         OnMessage(msg.remote, msg.msg);
       }

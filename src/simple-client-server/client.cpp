@@ -61,6 +61,7 @@ int main()
 
       if (!c.InComing().empty())
       {
+        // 将亡值 move 延长生命周期
         auto msg = c.InComing().pop_front().msg;
         switch (msg.header.id)
         {
