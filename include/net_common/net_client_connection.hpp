@@ -21,7 +21,7 @@ namespace net
             WriteValidation();
           } else {
             std::cout << "Read Validation Failed" << std::endl;
-            this->socket.close();
+            OnError(error_code::read_validation_error);
           } });
     };
 
@@ -33,11 +33,15 @@ namespace net
             this->ReadHeader();
           } else {
             std::cout << "Write Validation Failed" << std::endl;
-            this->socket.close();
+            OnError(error_code::write_validation_error);
           } });
     };
 
-    owned_message<T, client_connection<T>> PackMessage(message<T> *msg) override
+    void OnError(error_code ecode) override {
+
+    };
+
+    owned_message<T, client_connection<T>> PackMessage(const std::shared_ptr<message<T>> msg) override
     {
       owned_message<T, client_connection<T>> packed;
       packed.msg = std::move(*msg);
@@ -48,7 +52,7 @@ namespace net
   public:
     client_connection(asio::io_context &ctx, asio::ip::tcp::socket socket, tsqueue<owned_message<T, client_connection<T>>> &qIn) : connection<T, client_connection<T>>(ctx, std::move(socket), qIn)
     {
-      this->owner = connection<T, client_connection<T>>::owner_type::client;
+      this->owner = owner_type::client;
     };
 
     void ConnectToServer(const asio::ip::tcp::resolver::results_type &endpoints)

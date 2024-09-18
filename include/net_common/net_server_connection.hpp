@@ -39,12 +39,12 @@ namespace net
           }
           else
           {
-            std::cout << "[" << this->id << "] Validation Failed, Close" << std::endl;
-            this->socket.close();
+            std::cout << "[" << this->id << "] Validation Failed" << std::endl;
+            OnError(error_code::validation_error);
           }
         } else {
           std::cout << "[" << this->id << "] Read Validation Failed" << std::endl;
-          this->socket.close();
+          OnError(error_code::read_validation_error);
         } });
     }
 
@@ -57,11 +57,16 @@ namespace net
           ReadValidation();
         } else {
           std::cout << "[" << this->id << "] Write Validation Failed" << std::endl;
-          this->socket.close();
+          OnError(error_code::write_validation_error);
         } });
     }
 
-    owned_message<T, server_connection<T>> PackMessage(message<T> *msg) override
+    void OnError(error_code ecode) override
+    {
+      server->DisConnectClient(this->id);
+    };
+
+    owned_message<T, server_connection<T>> PackMessage(const std::shared_ptr<message<T>> msg) override
     {
       owned_message<T, server_connection<T>> packed;
       packed.remote = this->share();
@@ -80,17 +85,17 @@ namespace net
     {
       // 连接的验证码，可以一段时间更新一次，不要每个请求都去更新，太耗时了
       UpdateValidation();
-      this->owner = connection<T, server_connection<T>>::owner_type::server;
+      this->owner = owner_type::server;
     };
 
-    void ConnectToClient(uint32_t serverClientID)
+    bool ConnectToClient(uint32_t serverClientID)
     {
-      if (this->socket.is_open())
-      {
-        this->id = serverClientID;
-        // 向客户端发送验证码
-        WriteValidation();
-      }
+      if (!this->IsConnected())
+        return false;
+      this->id = serverClientID;
+      // 向客户端发送验证码
+      WriteValidation();
+      return true;
     }
   };
 }

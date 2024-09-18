@@ -19,14 +19,14 @@ protected:
     return true;
   }
 
-  virtual void OnClientValidated(std::shared_ptr<net::server_connection<CustomMsgType>> client)
+  virtual void OnClientValidated(std::shared_ptr<net::server_connection<CustomMsgType>> client) override
   {
     net::message<CustomMsgType> msg;
     msg.header.id = CustomMsgType::ServerValidated;
     client->Send(msg);
   }
 
-  virtual void OnClientDisConnect(std::shared_ptr<net::server_connection<CustomMsgType>> client)
+  virtual void OnClientDisConnect(std::shared_ptr<net::server_connection<CustomMsgType>> client) override
   {
     std::cout << "Removing client [" << client->GetID() << "], Remain client count: " << ClientCount() << std::endl;
   }
@@ -38,7 +38,7 @@ protected:
     case CustomMsgType::ServerPing:
     {
       std::cout << "[" << client->GetID() << "]" << "Server ping" << std::endl;
-      SendMessageClient(client, msg);
+      client->Send(msg);
       break;
     }
     case CustomMsgType::MessageAll:
@@ -58,7 +58,6 @@ int main()
 {
   CustomServer server(5050);
   server.Start();
-  server.Join();
 
   return 0;
 }

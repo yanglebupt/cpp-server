@@ -48,53 +48,50 @@ int main()
 
   while (!exit)
   {
-    if (c.IsConnected())
+    if (command == 1)
+      c.PingServer();
+    if (command == 2)
+      c.MessageAll();
+    if (command == 3)
+      exit = true;
+
+    command = 0;
+
+    if (!c.InComing().empty())
     {
-      if (command == 1)
-        c.PingServer();
-      if (command == 2)
-        c.MessageAll();
-      if (command == 3)
-        exit = true;
-
-      command = 0;
-
-      if (!c.InComing().empty())
+      // 将亡值 move 延长生命周期
+      auto msg = c.InComing().pop_front().msg;
+      switch (msg.header.id)
       {
-        // 将亡值 move 延长生命周期
-        auto msg = c.InComing().pop_front().msg;
-        switch (msg.header.id)
-        {
-        case CustomMsgType::ServerAccept:
-        {
-          std::cout << "Server accepted" << std::endl;
-          break;
-        }
-        case CustomMsgType::ServerValidated:
-        {
-          std::cout << "Server validated" << std::endl;
-          break;
-        }
-        case CustomMsgType::ServerDeny:
-        {
-          std::cout << "Server denied" << std::endl;
-          break;
-        }
-        case CustomMsgType::ServerPing:
-        {
-          std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
-          std::chrono::system_clock::time_point timeLast;
-          msg >> timeLast;
-          std::cout << "Server ping: " << std::chrono::duration<double>(timeNow - timeLast).count() << std::endl;
-          break;
-        }
-        case CustomMsgType::ServerMessage:
-        {
-          uint32_t clientId;
-          msg >> clientId;
-          std::cout << "Hello from [" << clientId << "]" << std::endl;
-        }
-        }
+      case CustomMsgType::ServerAccept:
+      {
+        std::cout << "Server accepted" << std::endl;
+        break;
+      }
+      case CustomMsgType::ServerValidated:
+      {
+        std::cout << "Server validated" << std::endl;
+        break;
+      }
+      case CustomMsgType::ServerDeny:
+      {
+        std::cout << "Server denied" << std::endl;
+        break;
+      }
+      case CustomMsgType::ServerPing:
+      {
+        std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
+        std::chrono::system_clock::time_point timeLast;
+        msg >> timeLast;
+        std::cout << "Server ping: " << std::chrono::duration<double>(timeNow - timeLast).count() << std::endl;
+        break;
+      }
+      case CustomMsgType::ServerMessage:
+      {
+        uint32_t clientId;
+        msg >> clientId;
+        std::cout << "Hello from [" << clientId << "]" << std::endl;
+      }
       }
     }
   }

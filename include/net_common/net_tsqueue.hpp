@@ -4,6 +4,7 @@
 #include <deque>
 #include <stddef.h>
 #include <condition_variable>
+#include <iostream>
 
 namespace net
 {
@@ -20,23 +21,23 @@ namespace net
     // 取的条件变量
     std::condition_variable cond;
 
+    bool _exit = false;
+
   public:
     tsqueue() = default;
     tsqueue(const tsqueue &) = delete;
 
-    void free()
-    {
-      clear();
-      std::deque<T>().swap(dq);
-      cond.notify_all();
-    }
-
     ~tsqueue()
     {
-      free();
+      std::cout << "tsqueue free" << std::endl;
+      clear();
+      std::deque<T>().swap(dq);
+      try_exit();
     };
 
     // 这里能返回引用吗？
+    // 一个线程获取 front 引用后，就释放锁了，那么另外一个线程也可以获取 front 引用，这时会造成同时修改 front
+    // 那么需要在修改的地方也加锁
     T &front()
     {
       std::lock_guard<std::mutex> lock(_mutex);
@@ -90,10 +91,19 @@ namespace net
     void wait()
     {
       std::unique_lock<std::mutex> lock(_mutex);
-      while (dq.empty())
+      while (dq.empty() && !_exit)
       {
         cond.wait(lock);
       }
+    }
+
+    void try_exit()
+    {
+      if (_exit)
+        return;
+      _exit = true;
+      // 释放的时候，通知其他线程我要没了，你们不要再堵塞这里等我了
+      cond.notify_all();
     }
 
     size_t count()
@@ -124,8 +134,8 @@ namespace net
     T pop_front()
     {
       std::lock_guard<std::mutex> lock(_mutex);
-      // 那取元素如何防止拷贝呢？这里不能引用
-      T v = dq.front();
+      // 那取元素如何防止拷贝呢，这里不能引用，直接把 front 移动出来
+      T v = std::move(dq.front());
       dq.pop_front();
       return v;
     }
@@ -133,7 +143,7 @@ namespace net
     T pop_back()
     {
       std::lock_guard<std::mutex> lock(_mutex);
-      T v = dq.back();
+      T v = std::move(dq.back());
       dq.pop_back();
       return v;
     }

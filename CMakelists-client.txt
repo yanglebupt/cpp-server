@@ -5,6 +5,7 @@ project(GameNetworkClient)
 file(GLOB_RECURSE SOURCES src/*.cpp)
 
 list(APPEND INCLUDE_LIST E:/CLibs/asio-1.30.2/include) 
+list(APPEND INCLUDE_LIST E:/CLibs/jsoncpp-1.9.6/include) 
 list(APPEND INCLUDE_LIST include)
 
 list(APPEND LIB_LIST ws2_32)
@@ -12,6 +13,6 @@ list(APPEND LIB_LIST wsock32)
 
 include_directories(${INCLUDE_LIST})
 
-add_executable(${PROJECT_NAME} src/simple-client-server/client.cpp)
+add_executable(${PROJECT_NAME} E:/CLibs/jsoncpp-1.9.6/include/jsoncpp.cpp src/simple-client-server/client.cpp)
 
 target_link_libraries(${PROJECT_NAME} PRIVATE ${LIB_LIST})

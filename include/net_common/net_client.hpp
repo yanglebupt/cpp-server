@@ -49,28 +49,17 @@ namespace net
 
     void DisConnect()
     {
-      if (IsConnected())
-        m_connection->DisConnect();
-
       ctx.stop();
+
       if (ctx_thread.joinable())
         ctx_thread.join();
 
       m_connection.reset();
     };
 
-    bool IsConnected()
-    {
-      if (m_connection != nullptr)
-        return m_connection->IsConnected();
-      else
-        return false;
-    }
-
     void Send(const message<T> &msg)
     {
-      if (IsConnected())
-        m_connection->Send(msg);
+      m_connection->Send(msg);
     }
 
     tsqueue<owned_message<T, client_connection<T>>> &InComing()
