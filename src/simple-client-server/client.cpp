@@ -4,6 +4,8 @@
 #include "net_common/net_client.hpp"
 #include "common.cpp"
 #include <iostream>
+#include <conio.h>
+#include <functional>
 
 class CustomClient : public net::client_interface<CustomMsgType>
 {
@@ -28,34 +30,59 @@ public:
   }
 };
 
+class CMDInputListener
+{
+private:
+  std::string line;
+
+public:
+  // 通过回调函数监听并处理每一行输入，回调不允许是异步函数
+  void operator()(std::function<void(const std::string &)> _Callback, bool hidden = false)
+  {
+    char ch;
+    if (_kbhit())
+    {                // 检查是否有输入
+      ch = _getch(); // 获取输入字符
+      if (ch == 13)
+      {
+        std::cout << std::endl;
+        _Callback(line);
+        line.clear();
+      }
+      else
+      {
+        if (!hidden)
+          std::cout << ch;
+        line += ch;
+      }
+    }
+  }
+};
+
 int main()
 {
   CustomClient c;
   c.Connect("127.0.0.1", 5050);
 
+  CMDInputListener cmd_input_listner;
+
   std::cout << "Press 1: Ping Server" << std::endl;
   std::cout << "Press 2: Send Hello to All Other Clients" << std::endl;
   std::cout << "Press 3: Exit" << std::endl;
 
-  int command = 0;
-  bool exit = false;
+  bool exit_flag = false;
 
-  std::thread t([&]()
-                {while (!exit)
-                {
-                  std::cin >> command;
-                } });
-
-  while (!exit)
+  while (!exit_flag)
   {
-    if (command == 1)
-      c.PingServer();
-    if (command == 2)
-      c.MessageAll();
-    if (command == 3)
-      exit = true;
-
-    command = 0;
+    cmd_input_listner([&](const std::string &line)
+                      {
+                        char command = line[0];
+                        if (command == '1')
+                          c.PingServer();
+                        if (command == '2')
+                          c.MessageAll();
+                        if (command == '3')
+                          exit_flag = true; });
 
     if (!c.InComing().empty())
     {
@@ -95,9 +122,6 @@ int main()
       }
     }
   }
-
-  if (t.joinable())
-    t.join();
 
   return 0;
 }
