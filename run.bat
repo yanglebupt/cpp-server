@@ -1,4 +1,4 @@
-for %%I in (client) do (
+for %%I in (client,server) do (
   ren CMakelists-%%I.txt CMakelists.txt 
   cd build/%%I
   del /S /Q *.*

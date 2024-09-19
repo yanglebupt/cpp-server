@@ -45,7 +45,7 @@ namespace net
     }
 
   public:
-    virtual void OnMessage(std::shared_ptr<Connection> client, const message<T> &msg) = 0;
+    virtual void OnMessage(std::shared_ptr<Connection> client, message<T> &msg) = 0;
 
     void StartHandleMessages()
     {

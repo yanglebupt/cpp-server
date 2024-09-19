@@ -64,9 +64,35 @@ int main()
 {
   net::message<SystemMessage> msg;
   msg.header.id = SystemMessage::MovePlayer;
+
+  Json::Value s;
+  s["name"] = "mike";
+  s["age"] = 10;
+
+  // char s[] = "hello";
+  msg << s;
   msg << 1001;
 
-  Send(msg);
+  net::message<SystemMessage> msg2;
+  msg2.header.id = SystemMessage::MovePlayer;
+  msg2 << msg;
+
+  net::message<SystemMessage> msg3;
+  msg3.header.id = SystemMessage::MovePlayer;
+
+  msg2 >> msg3;
+
+  int i;
+  // std::string s2;
+  Json::Value s2;
+  msg3 >> i;
+  msg3 >> s2;
+
+  std::cout << i << "," << s2.toStyledString() << std::endl;
+
+  std::cout << msg.size() << "," << msg2.size() << std::endl;
+
+  // Send(msg);
 
   return 0;
 }

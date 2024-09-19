@@ -67,6 +67,9 @@ namespace net
       return message_in_dq;
     }
 
+    // 客户端通过验证
+    virtual void OnServerDisConnect() {}
+
   protected:
     asio::io_context ctx;
     std::thread ctx_thread;

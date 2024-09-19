@@ -131,7 +131,7 @@ namespace net
     }
 
     // 接收到客户端消息包
-    virtual void OnMessage(std::shared_ptr<server_connection<T>> client, const message<T> &msg) = 0;
+    virtual void OnMessage(std::shared_ptr<server_connection<T>> client, message<T> &msg) = 0;
 
     asio::io_context ctx;
     asio::ip::tcp::acceptor m_acceptor;

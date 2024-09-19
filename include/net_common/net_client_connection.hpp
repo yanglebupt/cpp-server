@@ -37,9 +37,7 @@ namespace net
           } });
     };
 
-    void OnError(error_code ecode) override {
-
-    };
+    void OnError(error_code ecode) override {};
 
     owned_message<T, client_connection<T>> PackMessage(const std::shared_ptr<message<T>> msg) override
     {

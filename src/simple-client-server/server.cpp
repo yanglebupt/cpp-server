@@ -31,7 +31,7 @@ protected:
     std::cout << "Removing client [" << client->GetID() << "], Remain client count: " << ClientCount() << std::endl;
   }
 
-  virtual void OnMessage(std::shared_ptr<net::server_connection<CustomMsgType>> client, const net::message<CustomMsgType> &msg) override
+  virtual void OnMessage(std::shared_ptr<net::server_connection<CustomMsgType>> client, net::message<CustomMsgType> &msg) override
   {
     switch (msg.header.id)
     {
@@ -44,10 +44,11 @@ protected:
     case CustomMsgType::MessageAll:
     {
       std::cout << "[" << client->GetID() << "]" << "MessageAll" << std::endl;
-      net::message<CustomMsgType> msg;
-      msg.header.id = CustomMsgType::ServerMessage;
-      msg << client->GetID();
-      SendMessageAllClients(msg, client);
+      net::message<CustomMsgType> back_msg;
+      back_msg.header.id = CustomMsgType::ServerMessage;
+      back_msg << msg;
+      back_msg << client->GetID();
+      SendMessageAllClients(back_msg, client);
       break;
     }
     }
