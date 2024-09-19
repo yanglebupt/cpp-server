@@ -13,6 +13,8 @@
 class CustomClient : public net::client_interface<CustomMsgType>
 {
 public:
+  CustomClient() : net::client_interface<CustomMsgType>() {};
+  CustomClient(int max_retries) : net::client_interface<CustomMsgType>(max_retries) {};
   void PingServer()
   {
     net::message<CustomMsgType> msg;
@@ -31,6 +33,11 @@ public:
     msg.header.id = CustomMsgType::MessageAll;
     msg << json;
     Send(msg);
+  }
+
+  virtual void OnServerDisConnect() override
+  {
+    std::cout << "Server disconnect" << std::endl;
   }
 };
 
@@ -79,7 +86,7 @@ std::vector<std::string> s_split(const std::string &in, const std::string &delim
 
 int main()
 {
-  CustomClient c;
+  CustomClient c(5);
   c.Connect("127.0.0.1", 5050);
 
   std::cout << "Press 1: Ping Server" << std::endl;

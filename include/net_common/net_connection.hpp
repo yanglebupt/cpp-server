@@ -17,6 +17,7 @@ namespace net
     read_body_error,
     write_header_error,
     write_body_error,
+    connection_error,
   };
 
   enum class owner_type

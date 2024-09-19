@@ -13,8 +13,17 @@ namespace net
   template <typename T>
   class client_interface
   {
+  private:
+    asio::ip::tcp::resolver::results_type endpoints;
+
   public:
-    client_interface() {};
+    // 0 代表不进行重连
+    int max_retries;
+    // 0 代表不等待
+    int retry_wait_ms;
+    client_interface() : max_retries(0), retry_wait_ms(0) {};
+    client_interface(int max_retries) : max_retries(max_retries), retry_wait_ms(0) {};
+    client_interface(int max_retries, int retry_wait_ms) : max_retries(max_retries), retry_wait_ms(retry_wait_ms) {};
     virtual ~client_interface()
     {
       DisConnect();
@@ -28,11 +37,13 @@ namespace net
         // 用于处理 DNS 解析的一个组件。它可以将主机名（例如 "www.example.com"）转换为 IP 地址，或者将服务名（例如 "http"）转换为端口号。
         asio::ip::tcp::resolver resolver(ctx);
         // 上面获得的端点列表可能同时包含 IPv4 和 IPv6 端点，因此我们需要尝试其中的每一个，直到找到一个有效的端点。这使客户端程序独立于特定的 IP 版本。asio::connect() 函数会自动为我们执行此操作
-        asio::ip::tcp::resolver::results_type endpoints = resolver.resolve(host, std::to_string(port));
+        endpoints = resolver.resolve(host, std::to_string(port));
 
         // 创建连接
-        m_connection = std::make_unique<client_connection<T>>(ctx, asio::ip::tcp::socket(ctx), message_in_dq);
-        m_connection->ConnectToServer(endpoints);
+        m_connection = std::make_unique<client_connection<T>>(this, ctx, asio::ip::tcp::socket(ctx), message_in_dq);
+        m_connection->ConnectToServer(endpoints, max_retries, retry_wait_ms);
+
+        std::cout << "Start Connecting..." << std::endl;
 
         // 开始异步操作
         ctx_thread = std::thread([this]()
@@ -67,7 +78,12 @@ namespace net
       return message_in_dq;
     }
 
-    // 客户端通过验证
+    void DisConnectServer()
+    {
+      // 是否进行销毁，如果要重连，就不要销毁
+      OnServerDisConnect();
+    };
+
     virtual void OnServerDisConnect() {}
 
   protected:
