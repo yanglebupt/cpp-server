@@ -1,0 +1,30 @@
+cmake_minimum_required(VERSION 3.8)
+
+project(GameNetworkClient)
+
+# set(Boost_DEBUG ON)
+set(BOOST_ROOT E:/CLibs/boost_1_86_0)
+set(BOOST_INCLUDEDIR E:/CLibs/boost_1_86_0)
+set(BOOST_LIBRARYDIR E:/CLibs/boost_1_86_0/stage/lib)
+# 链接静态库
+set(Boost_LIB_PREFIX lib)
+set(Boost_ARCHITECTURE -s-x64)
+
+find_package(Boost 1.86.0 REQUIRED)  # beast asio header-only 不需要设置 Components 来查找
+
+list(APPEND INCLUDE_LIST E:/CLibs/jsoncpp-1.9.6/include) 
+list(APPEND INCLUDE_LIST include)
+
+message(STATUS ${Boost_INCLUDE_DIRS})
+message(STATUS ${Boost_LIBRARIES})
+
+list(APPEND INCLUDE_LIST ${Boost_INCLUDE_DIRS})
+list(APPEND LIB_LIST ${Boost_LIBRARIES})
+list(APPEND LIB_LIST ws2_32)
+list(APPEND LIB_LIST wsock32)
+
+include_directories(${INCLUDE_LIST})
+
+add_executable(${PROJECT_NAME} E:/CLibs/jsoncpp-1.9.6/include/jsoncpp.cpp src/http-client-server/main.cpp)
+
+target_link_libraries(${PROJECT_NAME} PRIVATE ${LIB_LIST})
