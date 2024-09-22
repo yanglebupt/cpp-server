@@ -5,7 +5,11 @@
 #include <boost/beast/version.hpp>
 #include <boost/asio.hpp>
 
-namespace beast = boost::beast;
-namespace http = boost::beast::http;
-namespace asio = boost::asio;
-using tcp = boost::asio::ip::tcp;
+namespace net::nhttp
+{
+  namespace beast = boost::beast;
+  namespace http = boost::beast::http;
+  namespace asio = boost::asio;
+  using tcp = boost::asio::ip::tcp;
+  using verb = boost::beast::http::verb;
+}

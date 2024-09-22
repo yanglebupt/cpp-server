@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Document</title>
+  </head>
+  <body>
+    <button onclick="test()">Send</button>
+    <script>
+      async function test() {
+        const res = await (
+          await fetch("http://localhost:8080/email?hobby=ball&fruit=banner", {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({ name: "Mike", age: 10 }),
+          })
+        ).json();
+        console.log(res);
+      }
+    </script>
+  </body>
+</html>

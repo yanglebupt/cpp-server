@@ -47,11 +47,21 @@ class router : public MiddlewareCollection
 class http_server : public router {}
 ```
 
-## Updating
+## Updated
+
+实现了 JSON 中间件 (内置支持 Query) 和 跨域请求中间件
+
+- 中间件需要对 req/res 进行增强，例如添加不同类型的属性，但是 c++ 本身不支持这种操作，难道还是只能用 JSON 吗？？
+- 模板实现动态增加属性：https://www.cnblogs.com/grass-and-moon/p/13680266.html
+- 中间件可以使用函数实现，但对于复杂情况尽量使用仿函数来实现，参考<a href="./include/net_http/buildin-middlewares/cors.hpp">内置的中间件</a>
+
+实现了指定路由加中间件，并且中间件支持可以请求方法匹配了，并且可以选择是否开启精确匹配
 
 后面考虑支持批量注册中间件
 
-目前使用的是请求路径精确匹配， 后续考虑支持请求路径正则匹配以及请求方法匹配
+## Example
+
+<a href="./src/http-client-server/main.cpp">基本使用</a>
 
 # WebSocket 通信
 

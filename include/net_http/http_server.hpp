@@ -1,6 +1,5 @@
 #pragma once
 
-#include "http_ns.hpp"
 #include "http_router.hpp"
 #include "http_connection.hpp"
 #include <iostream>
@@ -54,26 +53,26 @@ namespace net::nhttp
           std::shared_ptr<http_connection>
               client = std::make_shared<http_connection>(std::move(socket));
           // 回调函数结果 client 计数减一，不会释放，因为里面的回调函数，都会 shared_from_this() 来计数加一，延长生命周期
-          client->ReadRequest([this](const Request &req, Response &res)
+          client->ReadRequest([this](Request &req, Response &res)
                               { 
-                                std::string &&method = req.method_string();
-                                std::string &&target = req.target();
-                                std::cout << method << " " << target << std::endl;
-                                // 目前只过滤请求 target，后续会添加过滤请求 method 的功能
-                                ApplyMiddleware(middleware_map[target], req, res); });
+                                http::verb &&method = req.method();
+                                const std::string &target = req.Get<std::string>("path");
+                                std::cout << http::to_string(method) << " " << target << std::endl;
+                                const std::deque<RequestHandler> &middlewares = this->get_matched_paths(target, method);
+                                std::cout << "Get Middleware Count, " << middlewares.size() << std::endl;
+                                this->ApplyMiddleware(middlewares, req, res, 0, middlewares.size()); });
         }
         WaitForClientConnection(); });
     }
 
     // 通过中间件链处理请求
-    void ApplyMiddleware(std::deque<RequestHandler> &middlewares, const Request &req, Response &res)
+    void ApplyMiddleware(const std::deque<RequestHandler> &middlewares, Request &req, Response &res, int cur, int total)
     {
-      if (middlewares.empty())
+      if (cur >= total)
         return;
-      RequestHandler &md = middlewares.front();
-      md(req, res, [&]() mutable
-         { middlewares.pop_front();  // 不能弹出来，应该设置一个索引
-          ApplyMiddleware(middlewares, req, res); });
+      const RequestHandler &md = middlewares.at(cur);
+      md(req, res, [&]()
+         { ApplyMiddleware(middlewares, req, res, cur + 1, total); });
     }
 
   private:
