@@ -10,6 +10,20 @@
     <script>
       async function test() {
         const res = await (
+          await fetch(
+            "http://localhost:8080/test/info?hobby=ball&fruit=banner",
+            {
+              method: "POST",
+              headers: {
+                "Content-Type": "application/json",
+              },
+              body: JSON.stringify({ name: "Mike", age: 10 }),
+            }
+          )
+        ).json();
+        console.log(res);
+
+        const res2 = await (
           await fetch("http://localhost:8080/email?hobby=ball&fruit=banner", {
             method: "POST",
             headers: {
@@ -18,7 +32,7 @@
             body: JSON.stringify({ name: "Mike", age: 10 }),
           })
         ).json();
-        console.log(res);
+        console.log(res2);
       }
     </script>
   </body>

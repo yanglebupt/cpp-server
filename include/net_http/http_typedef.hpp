@@ -3,6 +3,7 @@
 #include "http_ns.hpp"
 #include "../utils/properties.hpp"
 #include <functional>
+#include <variant>
 
 namespace net::nhttp
 {
@@ -22,15 +23,37 @@ namespace net::nhttp
   typedef std::string PathArgument;
   typedef std::function<void(void)> NextFunction;
   typedef std::function<void(Request &, Response &)> RequestHandlerCallback;
+
   // 中间件就是一个函数
-  typedef std::function<void(Request &, Response &, NextFunction next)> RequestHandler;
+  class http_middleware_collection;
+  typedef std::function<void(Request &, Response &, NextFunction next)> http_middleware_func;
+  typedef std::variant<http_middleware_collection *, http_middleware_func> RequestHandler;
+
+  // 可以添加一些匹配规则
+  struct RequestHandlerConfig
+  {
+    bool exact = false;
+    bool is_route = false;
+  };
 
   struct RequestHandlerWrapper
   {
-    // 可以添加一些匹配规则
-    bool exact;
+    RequestHandlerConfig config;
     RequestHandler handler;
-    RequestHandlerWrapper(bool exact, RequestHandler handler) : exact(exact), handler(handler) {};
+    RequestHandlerWrapper(RequestHandlerConfig config, RequestHandler handler) : config(config), handler(handler) {};
+    ~RequestHandlerWrapper();
+
+    http_middleware_collection *GetMiddlewareCollection()
+    {
+      http_middleware_collection **res = std::get_if<http_middleware_collection *>(&handler);
+      return res == nullptr ? nullptr : *res;
+    };
+
+    http_middleware_func *GetMiddlewareFunc()
+    {
+      http_middleware_func *res = std::get_if<http_middleware_func>(&handler);
+      return res;
+    };
   };
 
   /**

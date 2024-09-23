@@ -55,13 +55,13 @@ class http_server : public router {}
 - 模板实现动态增加属性：https://www.cnblogs.com/grass-and-moon/p/13680266.html
 - 中间件可以使用函数实现，但对于复杂情况尽量使用仿函数来实现，参考<a href="./include/net_http/buildin-middlewares/cors.hpp">内置的中间件</a>
 
-实现了指定路由加中间件，并且中间件支持可以请求方法匹配了，并且可以选择是否开启精确匹配
+实现了指定路由加中间件，并且中间件支持请求方法匹配了，并且可以选择是否开启精确匹配
 
-后面考虑支持批量注册中间件
+后面考虑支持批量注册中间件？
 
 ## Example
 
-<a href="./src/http-client-server/main.cpp">基本使用</a>
+参考<a href="./src/http-client-server/main.cpp">基本使用</a>
 
 # WebSocket 通信
 

@@ -6,7 +6,7 @@
 class Prop
 {
 public:
-  ~Prop() {};
+  virtual ~Prop() {};
 };
 
 template <typename T>
@@ -18,7 +18,8 @@ private:
 public:
   virtual ~Property() {};
 
-  Property(T &&d) : data(std::forward<T>(d)) {};
+  Property(T &&d) : data(std::move(d)) {};
+  Property(const T &d) : data(d) {};
 
   void SetValue(const T &d) { data = d; }
   void SetValue(T &&d) { data = std::move(d); }
@@ -46,7 +47,7 @@ public:
   {
     if (props.find(name) != props.end())
     {
-      auto target = static_cast<Property<T> *>(props[name]);
+      Property<T> *target = dynamic_cast<Property<T> *>(props[name]);
       target->SetValue(std::move(data));
     }
     else
@@ -58,7 +59,7 @@ public:
   {
     if (props.find(name) != props.end())
     {
-      Property<T> *p = static_cast<Property<T> *>(props[name]);
+      Property<T> *p = dynamic_cast<Property<T> *>(props[name]);
       return p->GetValue();
     }
     else
