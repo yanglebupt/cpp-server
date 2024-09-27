@@ -19,12 +19,10 @@ public:
   {
     net::message<CustomMsgType> msg;
     msg.header.id = CustomMsgType::ServerPing;
-
     // 发送报文的时间
     std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
-
     msg << timeNow;
-    Send(msg);
+    Send(std::move(msg));
   }
 
   void MessageAll(const Json::Value &json)
@@ -32,7 +30,7 @@ public:
     net::message<CustomMsgType> msg;
     msg.header.id = CustomMsgType::MessageAll;
     msg << json;
-    Send(msg);
+    Send(std::move(msg));
   }
 
   virtual void OnServerDisConnect() override

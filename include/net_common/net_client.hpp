@@ -1,8 +1,6 @@
 #pragma once
 
 #include "asio.hpp"
-#include "net_message.hpp"
-#include "net_tsqueue.hpp"
 #include "net_client_connection.hpp"
 #include <thread>
 #include <memory>
@@ -70,7 +68,12 @@ namespace net
 
     void Send(const message<T> &msg)
     {
-      m_connection->Send(msg);
+      m_connection->Send(msg, false);
+    }
+
+    void Send(message<T> &&msg)
+    {
+      m_connection->Send(msg, true);
     }
 
     tsqueue<owned_message<T, client_connection<T>>> &InComing()

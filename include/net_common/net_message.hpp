@@ -8,6 +8,7 @@
 #include <iostream>
 #include <type_traits>
 #include <stdexcept>
+#include "../utils/owned_message_interface.hpp"
 #include "json/json.h"
 
 namespace net
@@ -239,52 +240,5 @@ namespace net
    * 携带消息的主体：谁发来的消息
    */
   template <typename T, typename Connection>
-  struct owned_message
-  {
-    /**
-     * 消息发送者指针
-     */
-    std::shared_ptr<Connection> remote = nullptr;
-    /**
-     * 发送的消息
-     */
-    message<T> msg;
-
-    owned_message() {};
-    owned_message(const owned_message<T, Connection> &other)
-    {
-      remote = other.remote;
-      msg = other.msg;
-    }
-    owned_message<T, Connection> &operator=(const owned_message<T, Connection> &other)
-    {
-      if (&other != this)
-      {
-        remote = other.remote;
-        msg = other.msg;
-      }
-      return *this;
-    }
-    owned_message(owned_message<T, Connection> &&other)
-    {
-      remote = std::move(other.remote);
-      msg = std::move(other.msg);
-    }
-    owned_message<T, Connection> &operator=(owned_message<T, Connection> &&other)
-    {
-      if (&other != this)
-      {
-        remote = std::move(other.remote);
-        msg = std::move(other.msg);
-      }
-      return *this;
-    }
-
-    // print
-    friend std::ostream &operator<<(std::ostream &os, const owned_message<T, Connection> &msg)
-    {
-      os << msg.msg;
-      return os;
-    }
-  };
+  using owned_message = owned_message_interface<message<T>, Connection>;
 }
