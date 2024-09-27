@@ -1,6 +1,6 @@
 #pragma once
 
-#include "net_logic_systerm.hpp"
+#include "../utils/logic_systerm.hpp"
 #include "net_server_connection.hpp"
 #include <iostream>
 #include <map>
@@ -8,7 +8,7 @@
 namespace net
 {
   template <typename T>
-  class server_interface : public logic_system<T, server_connection<T>>
+  class server_interface : public logic_system<message<T>, server_connection<T>>
   {
   public:
     // 注意不能在构造方法里面 Start，要不然回调函数就不会走 override 了，必须等构造完成后手动 Start
@@ -99,14 +99,14 @@ namespace net
       this->OnClientDisConnect(removed_client);
     }
 
-    void SendMessageAllClients(const message<T> &msg, std::shared_ptr<server_connection<T>> &ignoreClient)
+    void SendMessageAllClients(const message<T> &msg, std::shared_ptr<server_connection<T>> ignoreClient)
     {
       for (const std::pair<uint32_t, std::shared_ptr<server_connection<T>>> &pair : m_connections)
       {
         std::shared_ptr<server_connection<T>> client = pair.second;
         if (client == ignoreClient && client->GetID() == ignoreClient->GetID())
           continue;
-        client->Send(msg);
+        client->Send(msg, false);
       }
     }
 
