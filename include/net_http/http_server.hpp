@@ -13,6 +13,7 @@ namespace net::nhttp
   public:
     // 一些控制量
     std::vector<verb> NO_ROUTE_METHODS{verb::options};
+    uint8_t keep_alive_timeout = 60;
 
     http_server(uint16_t port) : m_acceptor(ctx, tcp::endpoint(tcp::v4(), port)) {}
 
@@ -55,7 +56,7 @@ namespace net::nhttp
         {
           std::cout << "[SERVER] New Connection: " << socket.remote_endpoint() << std::endl;
           std::shared_ptr<http_connection>
-              client = std::make_shared<http_connection>(std::move(socket));
+              client = std::make_shared<http_connection>(std::move(socket), keep_alive_timeout);
           // 回调函数结果 client 计数减一，不会释放，因为里面的回调函数，都会 shared_from_this() 来计数加一，延长生命周期
           client->ReadRequest([this](Request &req, Response &res)
                               { 

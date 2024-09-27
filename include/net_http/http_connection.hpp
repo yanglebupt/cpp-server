@@ -3,13 +3,17 @@
 #include "http_typedef.hpp"
 #include "../utils/functions.hpp"
 #include <iostream>
+#include <thread>
+
+int i = 0;
 
 namespace net::nhttp
 {
   class http_connection : public std::enable_shared_from_this<http_connection>
   {
+
   public:
-    http_connection(tcp::socket socket) : socket(std::move(socket)) {}
+    http_connection(tcp::socket socket, uint8_t keep_alive_timeout) : socket(std::move(socket)), keep_alive_timeout(keep_alive_timeout) {}
 
     ~http_connection()
     {
@@ -19,7 +23,7 @@ namespace net::nhttp
     void ReadRequest(RequestHandlerCallback _Callback)
     {
       http::async_read(socket, buffer, req, [self = shared_from_this(), _Callback](std::error_code ec, size_t length)
-                       { if(!ec) self->HandleRequest(_Callback); });
+                       { if(!ec){ self->HandleRequest(_Callback); } });
 
       // 短连接时间到了，关闭 socket
       deadline.async_wait([self = shared_from_this()](std::error_code ec)
@@ -52,6 +56,8 @@ namespace net::nhttp
     }
 
   protected:
+    uint8_t keep_alive_timeout;
+
     tcp::socket socket;
     // 接收数据的 buffer
     beast::flat_buffer buffer{1024 * 8};
@@ -61,7 +67,6 @@ namespace net::nhttp
     Response res;
 
     // 定时器，超时检测，http 默认是短连接，超时直接断开连接
-    asio::steady_timer deadline{
-        socket.get_executor(), std::chrono::seconds(60)};
+    asio::steady_timer deadline{socket.get_executor(), std::chrono::seconds(keep_alive_timeout)};
   };
 }
