@@ -26,7 +26,8 @@ namespace net::nhttp
       deadline.async_wait([self = shared_from_this()](std::error_code ec)
                           { 
                             std::cout << self->remote_endpoint() << " Connection Timeout!" << std::endl; 
-                            self->timeout = true; });
+                            self->timeout = true;
+                            self->socket.shutdown(tcp::socket::shutdown_both); });
     }
 
     void ReadRequest()
@@ -60,7 +61,7 @@ namespace net::nhttp
                         {
                           if(!ec){
                             if (!keep_alive){
-                              self->socket.shutdown(tcp::socket::shutdown_send);
+                              // self->socket.shutdown(tcp::socket::shutdown_send);
                               // 定时器不要再等待了，cancel 会以 asio::error::operation_aborted 触发回调
                               if (!self->timeout)
                                 self->deadline.cancel();

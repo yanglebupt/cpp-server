@@ -15,7 +15,7 @@ namespace net::nhttp
   public:
     // 一些控制量
     std::vector<verb> NO_ROUTE_METHODS{verb::options};
-    uint8_t keep_alive_timeout = 60;
+    uint8_t keep_alive_timeout = 5;
     uint8_t max_connection_count = 5;
 
     http_server(uint16_t port) : m_acceptor(ctx, tcp::endpoint(tcp::v4(), port)) {}

@@ -7,7 +7,12 @@
   </head>
   <body>
     <button onclick="test()">Send</button>
+    <button onclick="get()">Get</button>
     <script>
+      async function get() {
+        await fetch("http://localhost:8080/");
+      }
+
       async function test() {
         const res = await (
           await fetch(
