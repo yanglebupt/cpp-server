@@ -24,10 +24,20 @@ namespace net::nhttp
       ReadRequest();
       // 短连接时间到了，不能立刻关闭 socket，需要等待接收和发送完毕后才关闭
       deadline.async_wait([self = shared_from_this()](std::error_code ec)
-                          { 
-                            std::cout << self->remote_endpoint() << " Connection Timeout!" << std::endl; 
+                          {
+                            std::cout << self->remote_endpoint() << " Connection Timeout!" << std::endl;
                             self->timeout = true;
-                            self->socket.shutdown(tcp::socket::shutdown_both); });
+                            // 那如果是在 async_write 过程中 timeout 了，需要等待 async_write 回调中进行取消
+                            if (self->sending) return; 
+                            self->Cancel(); });
+    }
+
+    void Cancel()
+    {
+      // 不允许继续接受和发送消息
+      socket.shutdown(tcp::socket::shutdown_both);
+      // 取消当前 socket 注册的异步任务，例如 async_read
+      socket.cancel();
     }
 
     void ReadRequest()
@@ -36,7 +46,7 @@ namespace net::nhttp
       std::shared_ptr<beast::flat_buffer> buffer = std::make_shared<beast::flat_buffer>(1024 * 8);
       std::shared_ptr<Request> req = std::make_shared<Request>();
       http::async_read(socket, *buffer, *req, [self = shared_from_this(), req, buffer](std::error_code ec, size_t length)
-                       { if(!ec){
+                       {  if (ec) return;
                           self->c_count++;
                           bool need_keep_alive = self->NeedKeepAlive(*req);
                           owned_message_interface<Request, http_connection> msg;
@@ -44,8 +54,7 @@ namespace net::nhttp
                           msg.msg = std::move(*req);
                           self->qIn.emplace_back(msg);
                           if (need_keep_alive)
-                            self->ReadRequest();
-                        } });
+                            self->ReadRequest(); });
     }
 
     void WriteResponse(std::shared_ptr<Response> res, bool keep_alive)
@@ -57,15 +66,15 @@ namespace net::nhttp
       if (keep_alive)
         res->set(http::field::keep_alive, "timeout=" + std::to_string(keep_alive_timeout) + ", max=" + std::to_string(max_connection_count));
 
+      sending = true;
       http::async_write(socket, *res, [self = shared_from_this(), res, keep_alive](std::error_code ec, size_t length)
                         {
-                          if(!ec){
-                            if (!keep_alive){
-                              // self->socket.shutdown(tcp::socket::shutdown_send);
-                              // 定时器不要再等待了，cancel 会以 asio::error::operation_aborted 触发回调
-                              if (!self->timeout)
-                                self->deadline.cancel();
-                            }
+                          self->sending = false;
+                          if (self->timeout) self->Cancel();
+                          else {
+                            // 短链接的话，定时器不要再等待了，cancel 会以 asio::error::operation_aborted 触发回调
+                            if (!keep_alive)
+                              self->deadline.cancel();
                           } });
     }
 
@@ -84,5 +93,7 @@ namespace net::nhttp
     // 定时器，超时检测，http 默认是短连接，超时直接断开连接
     asio::steady_timer deadline{socket.get_executor(), std::chrono::seconds(keep_alive_timeout)};
     tsqueue<owned_message_interface<Request, http_connection>> &qIn;
+
+    bool sending = false;
   };
 }

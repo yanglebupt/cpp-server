@@ -15,7 +15,7 @@ namespace net::nhttp
   public:
     // 一些控制量
     std::vector<verb> NO_ROUTE_METHODS{verb::options};
-    uint8_t keep_alive_timeout = 5;
+    uint8_t keep_alive_timeout = 60;
     uint8_t max_connection_count = 5;
 
     http_server(uint16_t port) : m_acceptor(ctx, tcp::endpoint(tcp::v4(), port)) {}
@@ -93,7 +93,7 @@ namespace net::nhttp
 
       const std::string &method = req.method_string();
       const std::string &target = req.Get<std::string>("path");
-      std::cout << client->remote_endpoint() << " " << method << " " << target << std::endl;
+      std::cout << client->remote_endpoint() << " [" << method << "] " << target << std::endl;
       bool has_route = false;
       bool need_route = std::find(NO_ROUTE_METHODS.begin(), NO_ROUTE_METHODS.end(), req.method()) == NO_ROUTE_METHODS.end();
       const std::deque<http_middleware_func> &middlewares = this->get_matched_paths(target, method, has_route);
