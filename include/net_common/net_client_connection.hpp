@@ -56,7 +56,7 @@ namespace net
     };
 
   public:
-    client_connection(client_interface<T> *client, asio::io_context &ctx, asio::ip::tcp::socket socket, tsqueue<owned_message<T, client_connection<T>>> &qIn) : connection<T, client_connection<T>>(ctx, std::move(socket), qIn), client(client)
+    client_connection(client_interface<T> *client, asio::ip::tcp::socket socket, tsqueue<owned_message<T, client_connection<T>>> &qIn) : connection<T, client_connection<T>>(std::move(socket), qIn), client(client)
     {
       this->owner = owner_type::client;
     };

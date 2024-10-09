@@ -81,7 +81,7 @@ namespace net
     }
 
   public:
-    server_connection(server_interface<T> *server, asio::io_context &ctx, asio::ip::tcp::socket socket, tsqueue<owned_message<T, server_connection<T>>> &qIn) : connection<T, server_connection<T>>(ctx, std::move(socket), qIn), server(server)
+    server_connection(server_interface<T> *server, asio::ip::tcp::socket socket, tsqueue<owned_message<T, server_connection<T>>> &qIn) : connection<T, server_connection<T>>(std::move(socket), qIn), server(server)
     {
       // 连接的验证码，可以一段时间更新一次，不要每个请求都去更新，太耗时了
       UpdateValidation();

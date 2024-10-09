@@ -38,7 +38,7 @@ namespace net
         endpoints = resolver.resolve(host, std::to_string(port));
 
         // 创建连接
-        m_connection = std::make_unique<client_connection<T>>(this, ctx, asio::ip::tcp::socket(ctx), message_in_dq);
+        m_connection = std::make_unique<client_connection<T>>(this, asio::ip::tcp::socket(ctx), message_in_dq);
         m_connection->ConnectToServer(endpoints, max_retries, retry_wait_ms);
 
         std::cout << "Start Connecting..." << std::endl;

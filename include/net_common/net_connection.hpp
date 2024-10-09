@@ -38,8 +38,6 @@ namespace net
   protected:
     // each connection has an unique socket to remote
     asio::ip::tcp::socket socket;
-    // 异步上下文是来自连接的 owner
-    asio::io_context &ctx;
     // This queue holds all messages to be sent to the remote side of this connection
     // 确保顺序发送
     tsqueue<message<T>> message_out_dq;
@@ -156,7 +154,7 @@ namespace net
     // 是否即将释放，如果为 true 则不能再继续注册回调了
     bool will_released = false;
 
-    connection(asio::io_context &ctx, asio::ip::tcp::socket socket, tsqueue<owned_message<T, Connection>> &qIn) : ctx(ctx), socket(std::move(socket)), message_in_dq(qIn) {};
+    connection(asio::ip::tcp::socket socket, tsqueue<owned_message<T, Connection>> &qIn) : socket(std::move(socket)), message_in_dq(qIn) {};
 
     virtual ~connection()
     {
@@ -175,7 +173,7 @@ namespace net
       }
       // 由于这里是异步，因此需要 copy，否则在异步回调执行中就拿不到引用了，如果外面不需要用了，这里可以 move
       // 当然你可以去写重载函数
-      asio::post(ctx, [this, inner_msg = move ? std::move(const_cast<message<T> &>(msg)) : msg]() mutable
+      asio::post(this->socket.get_executor(), [this, inner_msg = move ? std::move(const_cast<message<T> &>(msg)) : msg]() mutable
                  {
                   bool isIdle = message_out_dq.empty();
                   // 往 out mesaage queue 添加要发送的消息，注意这里的 msg 是右值引用（左值），需要用 std::move 变成右值

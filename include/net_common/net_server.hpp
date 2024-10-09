@@ -1,6 +1,7 @@
 #pragma once
 
 #include "../utils/logic_systerm.hpp"
+#include "../net_pools/io_context_pool.hpp"
 #include "net_server_connection.hpp"
 #include <iostream>
 #include <map>
@@ -23,18 +24,17 @@ namespace net
     {
       try
       {
-        asio::io_context::work idle_worker(ctx);
-
+        io_context_pool::Instance()->Start();
         // 监听退出信号
         asio::signal_set exit_signals(ctx, SIGINT, SIGTERM);
         exit_signals.async_wait([this](auto, auto)
-                                { ctx.stop(); });
+                                { ctx.stop(); io_context_pool::Instance()->Stop(); });
         // 开启消息子线程
         this->StartHandleMessages();
         // 一直循环监听请求
         WaitForClientConnection();
 
-        std::cout << "[SERVER] Started!" << std::endl;
+        std::cout << "[SERVER] Started! " << io_context_pool::Instance()->size << " threads handle" << std::endl;
 
         // 主线程堵塞
         ctx.run();
@@ -49,7 +49,7 @@ namespace net
     void WaitForClientConnection()
     {
       // 监听客户端连接
-      m_acceptor.async_accept([this](std::error_code ec, asio::ip::tcp::socket socket)
+      m_acceptor.async_accept(io_context_pool::Instance()->GetIOContext(), [this](std::error_code ec, asio::ip::tcp::socket socket)
                               {
         bool isAccepted = !ec;
         if (isAccepted)
@@ -57,7 +57,7 @@ namespace net
           std::cout << "[SERVER] New Connection: " << socket.remote_endpoint() << std::endl;
           // 这个 client 需要保留下来，后面服务器响应的时候要用到
           std::shared_ptr<server_connection<T>>
-              client = std::make_shared<server_connection<T>>(this, ctx, std::move(socket), this->InComing());
+              client = std::make_shared<server_connection<T>>(this, std::move(socket), this->InComing());
 
           // 由具体的业务服务，确定该请求是否接收
           isAccepted = this->OnClientConnect(client);
