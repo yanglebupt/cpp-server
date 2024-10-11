@@ -10,9 +10,14 @@ namespace net
 {
   enum class error_code
   {
+    write_validation_res_error,
+    read_validation_res_error,
+    bad_accepted_error,
+    write_accepted_error,
+    read_accepted_error,
     read_validation_error,
     write_validation_error,
-    validation_error,
+    bad_validation_error,
     read_header_error,
     read_body_error,
     write_header_error,

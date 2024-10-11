@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../utils/logic_systerm.hpp"
-#include "../net_pools/io_context_pool.hpp"
+#include "../net_tools/io_context_pool.hpp"
 #include "net_server_connection.hpp"
 #include <iostream>
 #include <map>
@@ -60,23 +60,10 @@ namespace net
               client = std::make_shared<server_connection<T>>(this, std::move(socket), this->InComing());
 
           // 由具体的业务服务，确定该请求是否接收
-          isAccepted = this->OnClientConnect(client);
-          if (isAccepted)
-          {
-            // 背后添加一个异步任务，io_context 是在一个子线程中允许全部的异步任务吗，执行顺序是和添加顺序一致吗？
-            // 在一个异步任务的结束时添加异步任务，添加的异步任务会立刻执行，还是在重新调度？
-            if (client->ConnectToClient(nIDCounter++)){
-              // 这里 move 还是不 move 无所谓，反正函数结束会计数减一，因为后面也用不到 client 了
-              // 所以这里还是直接 move 吧
-              m_connections.insert({client->GetID(), std::move(client)});
-              std::cout << "[-----] Connection Approved" << std::endl;
-            }
-          }
-        }
+          isAccepted = this->ShouldAcceptClient(client);
+          client->ConnectToClient(nIDCounter++, isAccepted);
 
-        if(!isAccepted)
-        {
-          std::cout << "[-----] Connection Denied" << std::endl;
+          m_connections.insert({client->GetID(), std::move(client)});
         }
 
         // 循环监听
@@ -119,7 +106,7 @@ namespace net
 
   protected:
     // 决定是否建立连接
-    virtual bool OnClientConnect(std::shared_ptr<server_connection<T>> client)
+    virtual bool ShouldAcceptClient(std::shared_ptr<server_connection<T>> client)
     {
       return true;
     }

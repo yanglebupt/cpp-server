@@ -15,6 +15,51 @@ namespace net
     client_interface<T> *client;
     uint64_t validation = 0;
     uint64_t response = 0;
+    bool accepted = false;
+    bool validation_ok = false;
+
+    void ReadAccepted()
+    {
+      asio::async_read(this->socket, asio::buffer(&accepted, sizeof(bool)), [this](std::error_code ec, std::size_t length)
+                       {
+        if (!ec) {
+          if (this->accepted)
+          {
+            std::cout << "Server accepted" << std::endl;
+            // 开始验证
+            this->ReadValidation();
+          }
+          else
+          {
+            std::cout << "Server not accepted!" << std::endl;
+            OnError(error_code::bad_accepted_error);
+          }
+        } else {
+          std::cout << "Read Accepted Failed" << std::endl;
+          OnError(error_code::read_accepted_error);
+        } });
+    };
+
+    void ReadValidationResult()
+    {
+      asio::async_read(this->socket, asio::buffer(&validation_ok, sizeof(bool)), [this](std::error_code ec, std::size_t length)
+                       {
+        if (!ec) {
+          if (this->validation_ok)
+          {
+            std::cout << "Server validated" << std::endl;
+            this->ReadHeader();
+          }
+          else
+          {
+            std::cout << "Server validation failed!" << std::endl;
+            OnError(error_code::bad_validation_error);
+          }
+        } else {
+          std::cout << "Read Validation Result Failed" << std::endl;
+          OnError(error_code::read_validation_res_error);
+        } });
+    };
 
     void ReadValidation()
     {
@@ -35,7 +80,7 @@ namespace net
       asio::async_write(this->socket, asio::buffer(&response, sizeof(uint64_t)), [this](std::error_code ec, std::size_t length)
                         {
           if (!ec) {
-            this->ReadHeader();
+            this->ReadValidationResult();
           } else {
             std::cout << "Write Validation Failed" << std::endl;
             OnError(error_code::write_validation_error);
@@ -67,7 +112,7 @@ namespace net
                           {
             if (!ec) {
               // 接收服务端的验证码，计算响应码，并返回给服务端，就可以读取 Header 了
-              ReadValidation();
+              ReadAccepted();
             } else {
               // 这里可以考虑是否重新连接.....
               if (max_retries > 0){

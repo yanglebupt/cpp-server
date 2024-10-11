@@ -12,12 +12,11 @@ namespace net
   {
   private:
     server_interface<T> *server;
-
-  private:
     uint64_t validation = 0;
     uint64_t exceptResponseValidation = 0;
     uint64_t response = 0;
 
+    // 连接的验证码，可以一段时间更新一次，不要每个请求都去更新，太耗时了
     void UpdateValidation()
     {
       // 服务器产生
@@ -31,17 +30,7 @@ namespace net
       asio::async_read(this->socket, asio::buffer(&response, sizeof(uint64_t)), [this](std::error_code ec, std::size_t length)
                        {
         if (!ec) {
-          if (response == exceptResponseValidation)
-          {
-            std::cout << "[" << this->id << "] Validation OK" << std::endl;
-            server->OnClientValidated(this->share());
-            this->ReadHeader();
-          }
-          else
-          {
-            std::cout << "[" << this->id << "] Validation Failed" << std::endl;
-            OnError(error_code::validation_error);
-          }
+          this->WriteValidationResult(response == exceptResponseValidation); 
         } else {
           std::cout << "[" << this->id << "] Read Validation Failed" << std::endl;
           OnError(error_code::read_validation_error);
@@ -60,6 +49,28 @@ namespace net
           OnError(error_code::write_validation_error);
         } });
     }
+
+    void WriteValidationResult(bool validation_ok)
+    {
+      asio::async_write(this->socket, asio::buffer(&validation_ok, sizeof(bool)), [this, validation_ok](std::error_code ec, std::size_t length)
+                        {
+        if (!ec) {
+          if (validation_ok)
+          {
+            std::cout << "[" << this->id << "] Validation OK" << std::endl;
+            server->OnClientValidated(this->share());
+            this->ReadHeader();
+          }
+          else
+          {
+            std::cout << "[" << this->id << "] Validation Failed" << std::endl;
+            OnError(error_code::bad_validation_error);
+          }
+        } else {
+          std::cout << "[" << this->id << "] Write Validation Result Failed" << std::endl;
+          OnError(error_code::write_validation_res_error);
+        } });
+    };
 
     void OnError(error_code ecode) override
     {
@@ -83,19 +94,29 @@ namespace net
   public:
     server_connection(server_interface<T> *server, asio::ip::tcp::socket socket, tsqueue<owned_message<T, server_connection<T>>> &qIn) : connection<T, server_connection<T>>(std::move(socket), qIn), server(server)
     {
-      // 连接的验证码，可以一段时间更新一次，不要每个请求都去更新，太耗时了
-      UpdateValidation();
       this->owner = owner_type::server;
     };
 
-    bool ConnectToClient(uint32_t serverClientID)
+    void ConnectToClient(uint32_t serverClientID, bool accepted)
     {
-      if (!this->IsConnected())
-        return false;
       this->id = serverClientID;
-      // 向客户端发送验证码
-      WriteValidation();
-      return true;
-    }
+      asio::async_write(this->socket, asio::buffer(&accepted, sizeof(bool)), [this, accepted](std::error_code ec, std::size_t length)
+                        {
+        if (!ec) {
+          if (accepted) {
+            std::cout << "[" << this->id << "] Connection Approved " << std::endl;
+            // 开始验证 
+            this->UpdateValidation();
+            // 需要向客户端发送验证码
+            this->WriteValidation();
+          } else {
+            std::cout << "[" << this->id << "] Connection Denied " << std::endl;
+            OnError(error_code::bad_accepted_error);
+          }
+        } else {
+          std::cout << "[" << this->id << "] Write Accepted Failed" << std::endl;
+          OnError(error_code::write_accepted_error);
+        } });
+    };
   };
 }

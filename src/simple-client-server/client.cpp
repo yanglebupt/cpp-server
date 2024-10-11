@@ -84,12 +84,12 @@ std::vector<std::string> s_split(const std::string &in, const std::string &delim
 
 int main()
 {
-  CustomClient c(5);
-  c.Connect("127.0.0.1", 5050);
-
   std::cout << "Press 1: Ping Server" << std::endl;
   std::cout << "Press 2: Send Json Message to All Other Clients" << std::endl;
   std::cout << "Press 3: Exit" << std::endl;
+
+  CustomClient c(5);
+  c.Connect("127.0.0.1", 5050);
 
   bool exit_flag = false;
 
@@ -132,21 +132,6 @@ int main()
       auto msg = c.InComing().pop_front().msg;
       switch (msg.header.id)
       {
-      case CustomMsgType::ServerAccept:
-      {
-        std::cout << "Server accepted" << std::endl;
-        break;
-      }
-      case CustomMsgType::ServerValidated:
-      {
-        std::cout << "Server validated" << std::endl;
-        break;
-      }
-      case CustomMsgType::ServerDeny:
-      {
-        std::cout << "Server denied" << std::endl;
-        break;
-      }
       case CustomMsgType::ServerPing:
       {
         std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();

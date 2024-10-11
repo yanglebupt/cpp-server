@@ -11,19 +11,9 @@ public:
   CustomServer(uint16_t port) : net::server_interface<CustomMsgType>(port) {}
 
 protected:
-  virtual bool OnClientConnect(std::shared_ptr<net::server_connection<CustomMsgType>> client) override
+  virtual bool ShouldAcceptClient(std::shared_ptr<net::server_connection<CustomMsgType>> client) override
   {
-    net::message<CustomMsgType> msg;
-    msg.header.id = CustomMsgType::ServerAccept;
-    client->Send(msg);
     return true;
-  }
-
-  virtual void OnClientValidated(std::shared_ptr<net::server_connection<CustomMsgType>> client) override
-  {
-    net::message<CustomMsgType> msg;
-    msg.header.id = CustomMsgType::ServerValidated;
-    client->Send(msg);
   }
 
   virtual void OnClientDisConnect(std::shared_ptr<net::server_connection<CustomMsgType>> client) override

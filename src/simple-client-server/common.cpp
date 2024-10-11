@@ -10,9 +10,6 @@ typename std::underlying_type<T>::type PrintEnum(T const value)
 
 enum class CustomMsgType : uint32_t
 {
-  ServerAccept,
-  ServerValidated,
-  ServerDeny,
   ServerPing,
   MessageAll,
   ServerMessage,
