@@ -12,10 +12,10 @@ namespace globalThis {
       littleEndian?: boolean
     ): void;
 
-    readNumberType<T extends NumberTypeConstructor>(
-      numType: T,
+    readNumberType<T extends TNum, B extends NumberTypeConstructor<T>>(
+      numType: B,
       offset: number = 0,
       littleEndian?: boolean
-    ): InstanceType<T>;
+    ): InstanceType<B>;
   }
 }

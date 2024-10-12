@@ -1,29 +1,49 @@
-type TNum = number | bigint;
-type NumberTypeConstructor = new <T extends TNum = number>(
+export type TNum = number | bigint;
+export type NumberTypeConstructor<T extends TNum = number> = new (
   value: T
 ) => NumberType;
-export class NumberType<T extends TNum = number> {
+export abstract class NumberType<T extends TNum = number> {
   constructor(public value: T) {}
 }
 
 // char
-export class Int8 extends NumberType {}
-export class UInt8 extends NumberType {}
+export class Int8 extends NumberType {
+  static readonly BYTES = Int8Array.BYTES_PER_ELEMENT;
+}
+export class UInt8 extends NumberType {
+  static readonly BYTES = Uint8Array.BYTES_PER_ELEMENT;
+}
 
 // short
-export class Int16 extends NumberType {}
-export class UInt16 extends NumberType {}
+export class Int16 extends NumberType {
+  static readonly BYTES = Int16Array.BYTES_PER_ELEMENT;
+}
+export class UInt16 extends NumberType {
+  static readonly BYTES = Uint16Array.BYTES_PER_ELEMENT;
+}
 
 // int
-export class Int32 extends NumberType {}
-export class UInt32 extends NumberType {}
+export class Int32 extends NumberType {
+  static readonly BYTES = Int32Array.BYTES_PER_ELEMENT;
+}
+export class UInt32 extends NumberType {
+  static readonly BYTES = Uint32Array.BYTES_PER_ELEMENT;
+}
 
 // long
-export class BigInt64 extends NumberType<bigint> {}
-export class BigUInt64 extends NumberType<bigint> {}
+export class BigInt64 extends NumberType<bigint> {
+  static readonly BYTES = BigInt64Array.BYTES_PER_ELEMENT;
+}
+export class BigUInt64 extends NumberType<bigint> {
+  static readonly BYTES = BigUint64Array.BYTES_PER_ELEMENT;
+}
 
-export class Float extends NumberType {}
-export class Double extends NumberType {}
+export class Float extends NumberType {
+  static readonly BYTES = Float32Array.BYTES_PER_ELEMENT;
+}
+export class Double extends NumberType {
+  static readonly BYTES = Float64Array.BYTES_PER_ELEMENT;
+}
 
 Buffer.prototype.findFunc = function <T extends TNum>(
   num: NumberType<T>,
@@ -40,12 +60,12 @@ Buffer.prototype.findFunc = function <T extends TNum>(
   return func.bind(this);
 };
 
-Buffer.prototype.readNumberType = function <T extends NumberTypeConstructor>(
-  numType: T,
+Buffer.prototype.readNumberType = function <T extends TNum>(
+  numType: NumberTypeConstructor<T>,
   offset: number = 0,
   littleEndian?: boolean
-): InstanceType<T> {
-  const num = new numType(0) as InstanceType<T>;
+): InstanceType<NumberTypeConstructor<T>> {
+  const num = new numType(0 as any) as InstanceType<NumberTypeConstructor<T>>;
   num.value = this.findFunc(num, true, littleEndian)(offset);
   return num;
 };
