@@ -26,7 +26,10 @@ public:
   {
     for (unsigned int i = 0; i < size; i++)
     {
+      // work 释放后，如果没有异步任务了，io_context 也会释放
       works[i].reset();
+      // 此时如果有发送任务，那么会等到发送队列为空，全部发送完毕，发送回调则不再注册任务了
+      // 但是有读任务的时候，读回调中一直在注册任务
       if (threads[i].joinable())
         threads[i].join();
     }

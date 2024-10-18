@@ -25,13 +25,15 @@ namespace net
       try
       {
         io_context_pool::Instance()->Start();
-        // 监听退出信号
+        // 监听退出信号，永远存在的一个 work，直到 exit
         asio::signal_set exit_signals(ctx, SIGINT, SIGTERM);
         exit_signals.async_wait([this](auto, auto)
                                 { ctx.stop(); io_context_pool::Instance()->Stop(); });
         // 开启消息子线程
         this->StartHandleMessages();
-        // 一直循环监听请求
+        // 先注册了 async_accept 一直循环监听请求，那么一直存在任务
+        // 判断是否有任务的逻辑是：回调执行完毕，才会移除该任务，然后再判断是否还有任务，没有则 io_context stop
+        // 由于我们在回调函数里面，又注册了任务，因此 io_context 不会 stop 下来，除非你手动调用 stop
         WaitForClientConnection();
 
         std::cout << "[SERVER] Started! " << io_context_pool::Instance()->size << " threads handle" << std::endl;
