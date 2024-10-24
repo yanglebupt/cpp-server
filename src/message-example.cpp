@@ -1,6 +1,13 @@
 #include <iostream>
 #include "net_common/net_message.hpp"
 
+bool isLittleEndian()
+{
+  int i = 1;
+  char *i_ptr = reinterpret_cast<char *>(&i);
+  return *i_ptr == 1;
+};
+
 enum class SystemMessage : uint32_t
 {
   FireBullet,

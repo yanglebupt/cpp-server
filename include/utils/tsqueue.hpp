@@ -15,13 +15,12 @@ class tsqueue
 protected:
   std::mutex _mutex;
   std::deque<T> dq;
-
   // 取的条件变量
   std::condition_variable cond;
 
-  bool _exit = false;
-
 public:
+  bool exited = false;
+
   tsqueue() = default;
   tsqueue(const tsqueue &) = delete;
 
@@ -89,7 +88,7 @@ public:
   void wait()
   {
     std::unique_lock<std::mutex> lock(_mutex);
-    while (dq.empty() && !_exit)
+    while (dq.empty() && !exited)
     {
       cond.wait(lock);
     }
@@ -97,9 +96,9 @@ public:
 
   void try_exit()
   {
-    if (_exit)
+    if (exited)
       return;
-    _exit = true;
+    exited = true;
     // 释放的时候，通知其他线程我要没了，你们不要再堵塞这里等我了
     cond.notify_all();
   }
