@@ -20,76 +20,78 @@ namespace net
 
     void ReadAccepted()
     {
-      asio::async_read(this->socket, asio::buffer(&accepted, sizeof(bool)), [this](std::error_code ec, std::size_t length)
+      asio::async_read(this->socket, asio::buffer(&accepted, sizeof(bool)), [self = share()](std::error_code ec, std::size_t length)
                        {
         if (!ec) {
-          if (this->accepted)
+          if (self->accepted)
           {
-            std::cout << "Server accepted" << std::endl;
+            ok("Server accepted");
             // 开始验证
-            this->ReadValidation();
+            self->ReadValidation();
           }
           else
           {
-            std::cout << "Server not accepted!" << std::endl;
-            OnError(error_code::bad_accepted_error);
+            warn("Server not accepted!");
+            self->client->ConnectionFailed(error_code::bad_accepted_error);
           }
         } else {
-          std::cout << "Read Accepted Failed" << std::endl;
-          OnError(error_code::read_accepted_error);
+          err("Read Accepted Failed");
+          self->OnError(error_code::read_accepted_error);
         } });
     };
 
     void ReadValidationResult()
     {
-      asio::async_read(this->socket, asio::buffer(&validation_ok, sizeof(bool)), [this](std::error_code ec, std::size_t length)
+      asio::async_read(this->socket, asio::buffer(&validation_ok, sizeof(bool)), [self = share()](std::error_code ec, std::size_t length)
                        {
         if (!ec) {
-          if (this->validation_ok)
+          if (self->validation_ok)
           {
-            std::cout << "Server validated" << std::endl;
-            this->ReadHeader();
+            ok("Server validated");
+            self->client->Connected();
+            self->ReadHeader();
           }
           else
           {
-            std::cout << "Server validation failed!" << std::endl;
-            OnError(error_code::bad_validation_error);
+            warn("Server validation failed!");
+            self->client->ConnectionFailed(error_code::bad_validation_error);
           }
         } else {
-          std::cout << "Read Validation Result Failed" << std::endl;
-          OnError(error_code::read_validation_res_error);
+          err("Read Validation Result Failed");
+          self->OnError(error_code::read_validation_res_error);
         } });
     };
 
     void ReadValidation()
     {
       // 继承的 protected 属性，都要加上 this，不然编译不过，特别是匿名函数里面
-      asio::async_read(this->socket, asio::buffer(&validation, sizeof(uint64_t)), [this](std::error_code ec, std::size_t length)
+      asio::async_read(this->socket, asio::buffer(&validation, sizeof(uint64_t)), [self = share()](std::error_code ec, std::size_t length)
                        {
           if (!ec) {
-            response = this->scramble(validation);
-            WriteValidation();
+            self->response = self->scramble(self->validation);
+            self->WriteValidation();
           } else {
-            std::cout << "Read Validation Failed" << std::endl;
-            OnError(error_code::read_validation_error);
+            err("Read Validation Failed");
+            self->OnError(error_code::read_validation_error);
           } });
     };
 
     void WriteValidation()
     {
-      asio::async_write(this->socket, asio::buffer(&response, sizeof(uint64_t)), [this](std::error_code ec, std::size_t length)
+      asio::async_write(this->socket, asio::buffer(&response, sizeof(uint64_t)), [self = share()](std::error_code ec, std::size_t length)
                         {
           if (!ec) {
-            this->ReadValidationResult();
+            self->ReadValidationResult();
           } else {
-            std::cout << "Write Validation Failed" << std::endl;
-            OnError(error_code::write_validation_error);
+            err("Write Validation Failed");
+            self->OnError(error_code::write_validation_error);
           } });
     };
 
     void OnError(error_code ecode) override
     {
-      client->DisConnectServer();
+      client->OnError(ecode);
+      client->Stop();
     };
 
     owned_message<T, client_connection<T>> PackMessage(const std::shared_ptr<message<T>> msg) override
@@ -100,30 +102,32 @@ namespace net
       return packed;
     };
 
-  public:
-    client_connection(client_interface<T> *client, asio::ip::tcp::socket socket, tsqueue<owned_message<T, client_connection<T>>> &qIn) : connection<T, client_connection<T>>(std::move(socket), qIn), client(client)
+    std::shared_ptr<client_connection<T>> share()
     {
-      this->owner = owner_type::client;
-    };
+      return std::dynamic_pointer_cast<client_connection<T>>(this->shared_from_this());
+    }
+
+  public:
+    client_connection(client_interface<T> *client, asio::ip::tcp::socket socket, tsqueue<owned_message<T, client_connection<T>>> &qIn) : connection<T, client_connection<T>>(std::move(socket), qIn), client(client) {};
 
     void ConnectToServer(const asio::ip::tcp::resolver::results_type &endpoints, int max_retries = 0, int retry_wait_ms = 0)
     {
-      asio::async_connect(this->socket, endpoints, [this, max_retries, retry_wait_ms, &endpoints](std::error_code ec, asio::ip::tcp::endpoint endpoint)
+      asio::async_connect(this->socket, endpoints, [self = share(), max_retries, retry_wait_ms, &endpoints](std::error_code ec, asio::ip::tcp::endpoint endpoint)
                           {
             if (!ec) {
               // 接收服务端的验证码，计算响应码，并返回给服务端，就可以读取 Header 了
-              ReadAccepted();
+              self->ReadAccepted();
             } else {
               // 这里可以考虑是否重新连接.....
               if (max_retries > 0){
                 if (retry_wait_ms > 0)
                   std::this_thread::sleep_for(std::chrono::milliseconds(retry_wait_ms));
-                std::cout << "Connected ReTry....." << std::endl;
-                ConnectToServer(endpoints, max_retries - 1, retry_wait_ms);
+                warn("Connected ReTry.....");
+                self->ConnectToServer(endpoints, max_retries - 1, retry_wait_ms);
               }
               else {
-                std::cout << "Connected Failed" << std::endl;
-                OnError(error_code::connection_error);
+                err("Connected Failed");
+                self->client->ConnectionFailed(error_code::connection_error);
               }
             } });
     };

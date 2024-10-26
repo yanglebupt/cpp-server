@@ -11,7 +11,7 @@
 #include <chrono>
 #include <functional>
 #include <queue>
-#include "./tsqueue.hpp"
+#include "tsqueue.hpp"
 
 #define RESET "\033[0m"
 #define RED "\033[31m"     /* Red */
@@ -22,14 +22,10 @@
 #define CYAN "\033[36m"    /* Cyan */
 #define WHITE "\033[37m"   /* White */
 
-// 背景
-#define BOLDRED "\033[1m\033[31m"   /* Bold Red */
-#define BACKGROUND_GREEN "\033[42m" /* Green Background */
-
 // 可变长参数，支持格式化字符串输入
 #define info(format, ...) logger::color_log(WHITE, log_level::info, format, ##__VA_ARGS__);
 #define warn(format, ...) logger::color_log(YELLOW, log_level::warn, format, ##__VA_ARGS__);
-#define error(format, ...) logger::color_log(RED, log_level::error, format, ##__VA_ARGS__);
+#define err(format, ...) logger::color_log(RED, log_level::error, format, ##__VA_ARGS__);
 #define ok(format, ...) logger::color_log(GREEN, log_level::info, format, ##__VA_ARGS__);
 #define color(color, format, ...) logger::color_log(color, log_level::info, format, ##__VA_ARGS__);
 
@@ -266,7 +262,7 @@ private:
       // 文件夹不存在，无法新建文件
       if (access(cfg.save_dir, F_OK) == -1)
         if (mkdir(cfg.save_dir) == -1)
-          error("mkdir %s failed", cfg.save_dir);
+          err("mkdir %s failed", cfg.save_dir);
       if (cfg.save_override)
       {
         // 必须要写入 << 然后及时 close/flush ，才会出现新建的文件

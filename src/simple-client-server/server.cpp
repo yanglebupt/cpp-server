@@ -18,7 +18,7 @@ protected:
 
   virtual void OnClientDisConnect(std::shared_ptr<net::server_connection<CustomMsgType>> client) override
   {
-    std::cout << "Removing client [" << client->GetID() << "], Remain client count: " << ClientCount() << std::endl;
+    warn("Removing client [%d], Remain client count: %d", client->GetID(), ClientCount());
   }
 
   virtual void OnMessage(std::shared_ptr<net::server_connection<CustomMsgType>> client, net::message<CustomMsgType> &msg) override
@@ -27,13 +27,13 @@ protected:
     {
     case CustomMsgType::ServerPing:
     {
-      std::cout << "[" << client->GetID() << "]" << "Server ping" << std::endl;
+      ok("[%d] Server ping", client->GetID());
       client->Send(msg);
       break;
     }
     case CustomMsgType::MessageAll:
     {
-      std::cout << "[" << client->GetID() << "]" << "MessageAll" << std::endl;
+      ok("[%d] MessageAll", client->GetID());
       net::message<CustomMsgType> back_msg;
       back_msg.header.id = CustomMsgType::ServerMessage;
       back_msg << msg;

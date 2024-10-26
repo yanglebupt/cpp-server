@@ -2,6 +2,7 @@
 
 #include "asio.hpp"
 #include "net_client_connection.hpp"
+#include "../utils/logger.hpp"
 #include <thread>
 #include <memory>
 #include <iostream>
@@ -11,20 +12,42 @@ namespace net
   template <typename T>
   class client_interface
   {
+    friend class client_connection<T>;
+
   private:
     asio::ip::tcp::resolver::results_type endpoints;
+    std::thread t_log;
 
   public:
     // 0 代表不进行重连
     int max_retries;
     // 0 代表不等待
     int retry_wait_ms;
-    client_interface() : max_retries(0), retry_wait_ms(0) {};
-    client_interface(int max_retries) : max_retries(max_retries), retry_wait_ms(0) {};
-    client_interface(int max_retries, int retry_wait_ms) : max_retries(max_retries), retry_wait_ms(retry_wait_ms) {};
+    client_interface() : client_interface(0, 0) {};
+    client_interface(int max_retries) : client_interface(max_retries, 0) {};
+    client_interface(int max_retries, int retry_wait_ms) : max_retries(max_retries), retry_wait_ms(retry_wait_ms)
+    {
+      logger::cfg.show_time = true;
+      logger::cfg.show_thread_id = true;
+      logger::cfg.show_separator = true;
+      logger::cfg.show_trace = false;
+      logger::cfg.enable_save = true;
+      logger::cfg.save_override = true;
+      logger::cfg.external_log = true;
+      t_log = std::thread(&logger::ex_log);
+      logger::enable_setting();
+    };
+
     virtual ~client_interface()
     {
-      DisConnect();
+      // 因为读失败，不会继续添加读任务，写队列为空，也不会添加写任务，因此 io_context 会直接退出，不需要手动调用 stop
+      // 注意不能在线程注册任务的回调函数里面，调用 join 函数, 也就是自己 join 自己，或者两个或多个线程互相 join
+      if (ctx_thread.joinable())
+        ctx_thread.join();
+      logger::terminate();
+      if (t_log.joinable())
+        t_log.join();
+      logger::cfg.external_log = false;
     };
 
     // 只支持调用一次，不会维护发送到任意服务器的连接，连接不同的服务器，应该重新 new 一个 client，用另一个线程处理
@@ -38,10 +61,10 @@ namespace net
         endpoints = resolver.resolve(host, std::to_string(port));
 
         // 创建连接
-        m_connection = std::make_unique<client_connection<T>>(this, asio::ip::tcp::socket(ctx), message_in_dq);
+        m_connection = std::make_shared<client_connection<T>>(this, asio::ip::tcp::socket(ctx), message_in_dq);
         m_connection->ConnectToServer(endpoints, max_retries, retry_wait_ms);
 
-        std::cout << "Start Connecting..." << std::endl;
+        ok("Start Connecting...");
 
         // 开始异步操作
         ctx_thread = std::thread([this]()
@@ -51,29 +74,27 @@ namespace net
       }
       catch (const std::exception &e)
       {
-        std::cerr << "Client Exception:" << e.what() << std::endl;
+        err("Client Exception: %s", e.what());
         return false;
       }
     }
 
-    void DisConnect()
+    void Close()
     {
-      ctx.stop();
-
-      if (ctx_thread.joinable())
-        ctx_thread.join();
-
-      m_connection.reset();
-    };
+      if (m_connection != nullptr)
+        m_connection->Close();
+    }
 
     void Send(const message<T> &msg)
     {
-      m_connection->Send(msg, false);
+      if (m_connection != nullptr)
+        m_connection->Send(msg, false);
     }
 
     void Send(message<T> &&msg)
     {
-      m_connection->Send(msg, true);
+      if (m_connection != nullptr)
+        m_connection->Send(msg, true);
     }
 
     tsqueue<owned_message<T, client_connection<T>>> &InComing()
@@ -81,20 +102,23 @@ namespace net
       return message_in_dq;
     }
 
-    void DisConnectServer()
+    /*--------------- 一些回调函数，不同的业务服务，可以有不同的回调函数 ----------------*/
+  protected:
+    void Stop()
     {
-      // 是否进行销毁，如果要重连，就不要销毁
-      OnServerDisConnect();
+      m_connection.reset();
+      ctx.stop();
+      OnDisConnect();
     };
 
-    virtual void OnServerDisConnect() {}
+    virtual void ConnectionFailed(error_code ecode) {}
+    virtual void Connected() {}
+    virtual void OnError(error_code ecode) {}
+    virtual void OnDisConnect() {}
 
-  protected:
     asio::io_context ctx;
     std::thread ctx_thread;
-    std::unique_ptr<client_connection<T>> m_connection;
-
-  private:
+    std::shared_ptr<client_connection<T>> m_connection;
     // incoming message queue from server, and client need handle message in this queue
     tsqueue<owned_message<T, client_connection<T>>> message_in_dq;
   };

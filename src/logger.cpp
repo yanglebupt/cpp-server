@@ -17,9 +17,9 @@ int main()
   std::cout << logger::current_log_filename() << std::endl;
 
   std::thread t([]()
-                { error("Mike %s %d", "Jack", 32); });
+                { err("Mike %s %d", "Jack", 32); });
 
-  error("Mike %s %d", "Jack", 32);
+  err("Mike %s %d", "Jack", 32);
   info("Jack");
 
   ok("Mike %s %d", "Jack", 32);

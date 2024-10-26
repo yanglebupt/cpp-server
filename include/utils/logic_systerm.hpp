@@ -2,6 +2,7 @@
 
 #include "tsqueue.hpp"
 #include "owned_message_interface.hpp"
+#include "logger.hpp"
 #include <functional>
 #include <mutex>
 #include <thread>
@@ -15,16 +16,15 @@ protected:
   tsqueue<owned_message_interface<T, Connection>> message_in_dq;
   // handle incoming messages thread
   std::thread message_thread;
-  bool _exit = false;
 
   void HandleMessages()
   {
     // 这里需要判断服务器是否退出
-    while (!_exit)
+    while (true)
     {
       message_in_dq.wait();
 
-      if (_exit) // 即将退出，取出剩余的消息进行处理，再结束
+      if (message_in_dq.exited) // 即将退出，取出剩余的消息进行处理，再结束
       {
         while (!message_in_dq.empty())
         {
@@ -55,15 +55,13 @@ public:
     return message_in_dq;
   }
 
-public:
   virtual ~logic_system()
   {
-    _exit = true;
     // 通知队列不要等待了
     message_in_dq.try_exit();
     // 等待剩余消息处理完毕
     if (message_thread.joinable())
       message_thread.join();
-    std::cout << "[SERVER] Logic Systerm Exited!" << std::endl;
+    warn("[SERVER] Logic Systerm Exited!");
   };
 };

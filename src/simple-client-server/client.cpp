@@ -15,6 +15,7 @@ class CustomClient : public net::client_interface<CustomMsgType>
 public:
   CustomClient() : net::client_interface<CustomMsgType>() {};
   CustomClient(int max_retries) : net::client_interface<CustomMsgType>(max_retries) {};
+
   void PingServer()
   {
     net::message<CustomMsgType> msg;
@@ -33,9 +34,10 @@ public:
     Send(std::move(msg));
   }
 
-  virtual void OnServerDisConnect() override
+protected:
+  virtual void OnDisConnect() override
   {
-    std::cout << "Server disconnect" << std::endl;
+    warn("Disconnect");
   }
 };
 
@@ -108,7 +110,8 @@ int main()
       c.MessageAll(root);
     }
     if (command == '3')
-      exit_flag = true; };
+      c.Close();
+  };
 
   auto char_callback = [&](char ch, const std::string &line)
   {
@@ -126,30 +129,30 @@ int main()
   {
     cmd_input_listner(line_callback, false, char_callback);
 
-    if (!c.InComing().empty())
-    {
-      // 将亡值 move 延长生命周期
-      auto msg = c.InComing().pop_front().msg;
-      switch (msg.header.id)
-      {
-      case CustomMsgType::ServerPing:
-      {
-        std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
-        std::chrono::system_clock::time_point timeLast;
-        msg >> timeLast;
-        std::cout << "Server ping: " << std::chrono::duration<double>(timeNow - timeLast).count() << std::endl;
-        break;
-      }
-      case CustomMsgType::ServerMessage:
-      {
-        uint32_t clientId;
-        std::string json_str;
-        msg >> clientId;
-        msg >> json_str;
-        std::cout << "Hello from [" << clientId << "], " << json_str << std::endl;
-      }
-      }
-    }
+    // if (!c.InComing().empty())
+    // {
+    //   // 将亡值 move 延长生命周期
+    //   auto msg = c.InComing().pop_front().msg;
+    //   switch (msg.header.id)
+    //   {
+    //   case CustomMsgType::ServerPing:
+    //   {
+    //     std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
+    //     std::chrono::system_clock::time_point timeLast;
+    //     msg >> timeLast;
+    //     ok("Server ping: %lf", std::chrono::duration<double>(timeNow - timeLast).count());
+    //     break;
+    //   }
+    //   case CustomMsgType::ServerMessage:
+    //   {
+    //     uint32_t clientId;
+    //     std::string json_str;
+    //     msg >> clientId;
+    //     msg >> json_str;
+    //     ok("Hello from [%d], %s", clientId, json_str.c_str());
+    //   }
+    //   }
+    // }
   }
 
   return 0;

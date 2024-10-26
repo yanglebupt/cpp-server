@@ -26,10 +26,10 @@ public:
 
   ~tsqueue()
   {
-    std::cout << "tsqueue free" << std::endl;
     clear();
     std::deque<T>().swap(dq);
     try_exit();
+    // std::cout << "tsqueue free" << std::endl;
   };
 
   // 这里能返回引用吗？

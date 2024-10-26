@@ -3,8 +3,8 @@
 #include "asio.hpp"
 #include "net_message.hpp"
 #include "../utils/tsqueue.hpp"
+#include "../utils/logger.hpp"
 #include <memory>
-#include <iostream>
 
 namespace net
 {
@@ -25,10 +25,11 @@ namespace net
     connection_error,
   };
 
-  enum class owner_type
+  enum class connection_state
   {
-    server,
-    client
+    connected,
+    disconnected,
+    halfclosed,
   };
 
   /**
@@ -52,8 +53,7 @@ namespace net
     // 连接的唯一 ID
     uint32_t id = 0;
 
-    // 谁创建了这个连接
-    owner_type owner;
+    connection_state con_state;
 
     // "Encrypt" Validation data
     uint64_t scramble(uint64_t nInput)
@@ -67,77 +67,79 @@ namespace net
     {
       // 这里不能使用局部变量，局部变量在异步可能释放，但是这里会出现频繁取第一个元素，导致多次拷贝
       // 由于这里只涉及从队列读数据，不存在竞争问题，因此队列返回引用即可
-      asio::async_write(socket, asio::buffer(&message_out_dq.front().header, sizeof(message_header<T>)), [this](std::error_code ec, std::size_t length)
+      asio::async_write(socket, asio::buffer(&message_out_dq.front().header, sizeof(message_header<T>)), [self = this->shared_from_this()](std::error_code ec, std::size_t length)
                         {
         if (!ec) {
-          if (message_out_dq.front().body.size() > 0)
+          if (self->message_out_dq.front().body.size() > 0)
           {
             // 有 body
-            WriteBody();
+            self->WriteBody();
           }
           else
           {
             // 无 body，写完毕
-            message_out_dq.remove_front();
-            if (!message_out_dq.empty()) WriteHeader();
+            self->message_out_dq.remove_front();
+            if (!self->message_out_dq.empty())
+              self->WriteHeader();
           }
         } else {
-          std::cout << "[" << id << "] Write Header Failed" << std::endl;
-          OnError(error_code::write_header_error);
+          err("[%d] Write Header Failed", self->id);
+          self->OnError(error_code::write_header_error);
         } });
     };
 
     void WriteBody()
     {
-      asio::async_write(socket, asio::buffer(message_out_dq.front().body.data(), message_out_dq.front().body.size()), [this](std::error_code ec, std::size_t length)
+      asio::async_write(socket, asio::buffer(message_out_dq.front().body.data(), message_out_dq.front().body.size()), [self = this->shared_from_this()](std::error_code ec, std::size_t length)
                         {
         if (!ec) {
-          message_out_dq.remove_front();
-          if (!message_out_dq.empty())
-            WriteHeader();
+          self->message_out_dq.remove_front();
+          if (!self->message_out_dq.empty())
+            self->WriteHeader();
         } else {
-          std::cout << "[" << id << "] Write Body Failed" << std::endl;
-          OnError(error_code::write_body_error);
+          err("[%d] Write Body Failed", self->id);
+          self->OnError(error_code::write_body_error);
         } });
     };
 
     void ReadHeader()
     {
+      con_state = connection_state::connected;
       // 这里涉及到写了，后面迁移多线程可能存在数据竞争，因此每次写都需要在线程的局部变量上写
       // 这里使用智能指针，自动释放内存，如果自己手动 new ，在后续很容易忘记 delete（或者出现多次 delete，智能指针可以多次 reset）
       // 例如出现错误的时候，需要手动 delete，但是智能指针的话，如果在回调函数中判断错误（不会继续向下传递）
       // 那么函数结束计数直接为 0，自动释放了
       std::shared_ptr<message<T>> msg = std::make_shared<message<T>>();
-      asio::async_read(socket, asio::buffer(&msg->header, sizeof(message_header<T>)), [this, msg](std::error_code ec, std::size_t length)
+      asio::async_read(socket, asio::buffer(&msg->header, sizeof(message_header<T>)), [self = this->shared_from_this(), msg](std::error_code ec, std::size_t length)
                        {
         if (!ec) {
           if (msg->header.size > 0)
           {
             // 有 body
             msg->body.resize(msg->header.size);
-            ReadBody(msg);
+            self->ReadBody(msg);
           }
           else
           {
             // 无 body
-            PushMessageToQueue(msg);
+            self->PushMessageToQueue(msg);
           }
         } else {
-          std::cout << "[" << id << "] Read Header Failed" << std::endl;
+          err("[%d] Read Header Failed", self->id);
           // 这里可以调用离线，这样不用发消息时才确定离线，读取 Header 失败，一定是离线导致吗？
-          OnError(error_code::read_header_error);
+          self->OnError(error_code::read_header_error);
         } });
     };
 
     void ReadBody(std::shared_ptr<message<T>> msg)
     {
-      asio::async_read(socket, asio::buffer(msg->body.data(), msg->body.size()), [this, msg](std::error_code ec, std::size_t length)
+      asio::async_read(socket, asio::buffer(msg->body.data(), msg->body.size()), [self = this->shared_from_this(), msg](std::error_code ec, std::size_t length)
                        {
         if (!ec) {
-          PushMessageToQueue(msg);
+          self->PushMessageToQueue(msg);
         } else {
-          std::cout << "[" << id << "] Read Body Failed" << std::endl;
-          OnError(error_code::read_body_error);
+          err("[%d] Read Body Failed", self->id);
+          self->OnError(error_code::read_body_error);
         } });
     };
 
@@ -156,16 +158,22 @@ namespace net
     virtual void OnError(error_code ecode) {};
 
   public:
-    // 是否即将释放，如果为 true 则不能再继续注册回调了
-    bool will_released = false;
-
     connection(asio::ip::tcp::socket socket, tsqueue<owned_message<T, Connection>> &qIn) : socket(std::move(socket)), message_in_dq(qIn) {};
 
     virtual ~connection()
     {
-      std::cout << "[" << id << "] Connection Destroy, Closed" << std::endl;
+      warn("[%d] Connection Destruction, Socket Closed", id);
       socket.close();
     };
+
+    void Close()
+    {
+      if (con_state != connection_state::connected)
+        return;
+      warn("[%d] Close Connection, Socket Shutdown Send", id);
+      socket.shutdown(asio::socket_base::shutdown_send);
+      con_state = connection_state::halfclosed;
+    }
 
     uint32_t GetID() const { return id; }
 
@@ -173,26 +181,26 @@ namespace net
     {
       if (!IsConnected())
       {
-        std::cout << "[" << id << "] Will Released! Can't send messages anymore" << std::endl;
+        warn("[%d] Will Released! Can't send messages anymore", id);
         return false;
       }
       // 由于这里是异步，因此需要 copy，否则在异步回调执行中就拿不到引用了，如果外面不需要用了，这里可以 move
       // 当然你可以去写重载函数
-      asio::post(this->socket.get_executor(), [this, inner_msg = move ? std::move(const_cast<message<T> &>(msg)) : msg]() mutable
+      asio::post(this->socket.get_executor(), [self = this->shared_from_this(), inner_msg = move ? std::move(const_cast<message<T> &>(msg)) : msg]() mutable
                  {
-                  bool isIdle = message_out_dq.empty();
+                  bool isIdle = self->message_out_dq.empty();
                   // 往 out mesaage queue 添加要发送的消息，注意这里的 msg 是右值引用（左值），需要用 std::move 变成右值
-                  message_out_dq.emplace_back(std::move(inner_msg));
+                  self->message_out_dq.emplace_back(std::move(inner_msg));
                   // 如果在添加消息之前，队列为空，说明此时是空闲的，因此需要唤起任务
                   // 否则，发送消息的任务已经启动了，不需要再次启动
                   if (isIdle)
-                    WriteHeader(); });
+                    self->WriteHeader(); });
       return true;
     };
 
     bool IsConnected() const
     {
-      return socket.is_open() && !will_released;
+      return socket.is_open() && con_state == connection_state::connected;
     };
   };
 

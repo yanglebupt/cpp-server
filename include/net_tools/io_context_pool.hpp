@@ -28,13 +28,21 @@ public:
     {
       // work 释放后，如果没有异步任务了，io_context 也会释放
       works[i].reset();
+    }
+  };
+
+  void Join()
+  {
+    for (unsigned int i = 0; i < size; i++)
+    {
       // 此时如果有发送任务，那么会等到发送队列为空，全部发送完毕，发送回调则不再注册任务了
       // 但是有读任务的时候，读回调中一直在注册任务
+      // 这也就是客户端连接上来后，服务器无法退出，会堵塞在这里
+      // 因此调用 Join 之前需要确保关闭了 socket，取消读注册任务
       if (threads[i].joinable())
         threads[i].join();
     }
-    io_context_pool::Reset();
-  };
+  }
 
   void Start()
   {

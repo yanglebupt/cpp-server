@@ -106,15 +106,6 @@ namespace net
       return body.size();
     }
 
-    void print() const
-    {
-      for (const uint8_t &n : body)
-      {
-        std::cout << (int)n << ",";
-      }
-      std::cout << std::endl;
-    }
-
     // print
     friend std::ostream &operator<<(std::ostream &os, const message &message)
     {
@@ -159,7 +150,7 @@ namespace net
         // DataType 如果是 char[n]，那么 sizeof(DataType) 可以获取正常大小。但是不能是 char*
         static_assert(std::is_standard_layout<DataType>::value, "Data is too complex and it cannot be serialized");
         // 不允许指针类型
-        static_assert(!std::is_pointer<DataType>::value, "can't append data in message by a pointer");
+        static_assert(!std::is_pointer<DataType>::value, "Can't append data in message by a pointer");
 
         size_t ori_body_size = msg.body.size();
 
@@ -217,7 +208,7 @@ namespace net
       else
       {
         static_assert(std::is_standard_layout<DataType>::value, "Data is too complex and it cannot be serialized");
-        static_assert(!std::is_pointer<DataType>::value, "can't append data in message by a pointer");
+        static_assert(!std::is_pointer<DataType>::value, "Can't append data in message by a pointer");
 
         size_t ori_body_size = msg.body.size();
 

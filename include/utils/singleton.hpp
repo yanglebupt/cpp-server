@@ -2,6 +2,7 @@
 
 #include <memory>
 #include <mutex>
+#include <iostream>
 
 template <typename Class>
 class enable_private_make_shared
@@ -40,11 +41,5 @@ public:
     if (_instance == nullptr)
       _instance = enable_private_make_shared<T>::create();
     return _instance;
-  }
-
-  static void Reset()
-  {
-    std::unique_lock<std::mutex> lock(_mtx);
-    _instance.reset();
   }
 };

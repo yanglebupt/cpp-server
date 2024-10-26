@@ -27,54 +27,56 @@ namespace net
 
     void ReadValidation()
     {
-      asio::async_read(this->socket, asio::buffer(&response, sizeof(uint64_t)), [this](std::error_code ec, std::size_t length)
+      asio::async_read(this->socket, asio::buffer(&response, sizeof(uint64_t)), [self = share()](std::error_code ec, std::size_t length)
                        {
         if (!ec) {
-          this->WriteValidationResult(response == exceptResponseValidation); 
+          self->WriteValidationResult(self->response == self->exceptResponseValidation);
         } else {
-          std::cout << "[" << this->id << "] Read Validation Failed" << std::endl;
-          OnError(error_code::read_validation_error);
+          err("[%d] Read Validation Failed", self->id);
+          self->OnError(error_code::read_validation_error);
         } });
     }
 
     void WriteValidation()
     {
-      asio::async_write(this->socket, asio::buffer(&validation, sizeof(uint64_t)), [this](std::error_code ec, std::size_t length)
+      asio::async_write(this->socket, asio::buffer(&validation, sizeof(uint64_t)), [self = share()](std::error_code ec, std::size_t length)
                         {
         if (!ec) {
           // 等待客户端返回响应码，内部校验通过，开始读取 Header
-          ReadValidation();
+          self->ReadValidation();
         } else {
-          std::cout << "[" << this->id << "] Write Validation Failed" << std::endl;
-          OnError(error_code::write_validation_error);
+          err("[%d] Write Validation Failed", self->id);
+          self->OnError(error_code::write_validation_error);
         } });
     }
 
     void WriteValidationResult(bool validation_ok)
     {
-      asio::async_write(this->socket, asio::buffer(&validation_ok, sizeof(bool)), [this, validation_ok](std::error_code ec, std::size_t length)
+      asio::async_write(this->socket, asio::buffer(&validation_ok, sizeof(bool)), [self = share(), validation_ok](std::error_code ec, std::size_t length)
                         {
         if (!ec) {
           if (validation_ok)
           {
-            std::cout << "[" << this->id << "] Validation OK" << std::endl;
-            server->OnClientValidated(this->share());
-            this->ReadHeader();
+            ok("[%d] Validation OK", self->id);
+            self->server->AddClient(self->share());
+            self->server->OnClientValidated(self->share());
+            self->ReadHeader();
           }
           else
           {
-            std::cout << "[" << this->id << "] Validation Failed" << std::endl;
-            OnError(error_code::bad_validation_error);
+            warn("[%d] Validation Failed", self->id);
+            self->OnError(error_code::bad_validation_error);
           }
         } else {
-          std::cout << "[" << this->id << "] Write Validation Result Failed" << std::endl;
-          OnError(error_code::write_validation_res_error);
+          err("[%d] Write Validation Result Failed", self->id);
+          self->OnError(error_code::write_validation_res_error);
         } });
     };
 
     void OnError(error_code ecode) override
     {
-      server->DisConnectClient(this->id);
+      server->OnError(ecode);
+      server->RemoveClient(this->id);
     };
 
     owned_message<T, server_connection<T>> PackMessage(const std::shared_ptr<message<T>> msg) override
@@ -92,30 +94,27 @@ namespace net
     }
 
   public:
-    server_connection(server_interface<T> *server, asio::ip::tcp::socket socket, tsqueue<owned_message<T, server_connection<T>>> &qIn) : connection<T, server_connection<T>>(std::move(socket), qIn), server(server)
-    {
-      this->owner = owner_type::server;
-    };
+    server_connection(server_interface<T> *server, asio::ip::tcp::socket socket, tsqueue<owned_message<T, server_connection<T>>> &qIn) : connection<T, server_connection<T>>(std::move(socket), qIn), server(server) {};
 
     void ConnectToClient(uint32_t serverClientID, bool accepted)
     {
       this->id = serverClientID;
-      asio::async_write(this->socket, asio::buffer(&accepted, sizeof(bool)), [this, accepted](std::error_code ec, std::size_t length)
+      asio::async_write(this->socket, asio::buffer(&accepted, sizeof(bool)), [self = share(), accepted](std::error_code ec, std::size_t length)
                         {
         if (!ec) {
           if (accepted) {
-            std::cout << "[" << this->id << "] Connection Approved " << std::endl;
-            // 开始验证 
-            this->UpdateValidation();
+            ok("[%d] Connection Approved", self->id);
+            // 开始验证
+            self->UpdateValidation();
             // 需要向客户端发送验证码
-            this->WriteValidation();
+            self->WriteValidation();
           } else {
-            std::cout << "[" << this->id << "] Connection Denied " << std::endl;
-            OnError(error_code::bad_accepted_error);
+            warn("[%d] Connection Denied", self->id);
+            self->OnError(error_code::bad_accepted_error);
           }
         } else {
-          std::cout << "[" << this->id << "] Write Accepted Failed" << std::endl;
-          OnError(error_code::write_accepted_error);
+          err("[%d] Write Accepted Failed", self->id);
+          self->OnError(error_code::write_accepted_error);
         } });
     };
   };
