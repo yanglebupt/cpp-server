@@ -54,6 +54,7 @@ namespace net
     uint32_t id = 0;
 
     connection_state con_state;
+    bool has_shutdown_send = false;
 
     // "Encrypt" Validation data
     uint64_t scramble(uint64_t nInput)
@@ -96,6 +97,8 @@ namespace net
           self->message_out_dq.remove_front();
           if (!self->message_out_dq.empty())
             self->WriteHeader();
+          else if (self->con_state == connection_state::halfclosed)
+            self->ShutdownSend();
         } else {
           err("[%d] Write Body Failed", self->id);
           self->OnError(error_code::write_body_error);
@@ -170,9 +173,18 @@ namespace net
     {
       if (con_state != connection_state::connected)
         return;
+      con_state = connection_state::halfclosed;
+      if (message_out_dq.empty())
+        ShutdownSend();
+    }
+
+    void ShutdownSend()
+    {
+      if (has_shutdown_send)
+        return;
+      has_shutdown_send = true;
       warn("[%d] Close Connection, Socket Shutdown Send", id);
       socket.shutdown(asio::socket_base::shutdown_send);
-      con_state = connection_state::halfclosed;
     }
 
     uint32_t GetID() const { return id; }

@@ -129,30 +129,30 @@ int main()
   {
     cmd_input_listner(line_callback, false, char_callback);
 
-    // if (!c.InComing().empty())
-    // {
-    //   // 将亡值 move 延长生命周期
-    //   auto msg = c.InComing().pop_front().msg;
-    //   switch (msg.header.id)
-    //   {
-    //   case CustomMsgType::ServerPing:
-    //   {
-    //     std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
-    //     std::chrono::system_clock::time_point timeLast;
-    //     msg >> timeLast;
-    //     ok("Server ping: %lf", std::chrono::duration<double>(timeNow - timeLast).count());
-    //     break;
-    //   }
-    //   case CustomMsgType::ServerMessage:
-    //   {
-    //     uint32_t clientId;
-    //     std::string json_str;
-    //     msg >> clientId;
-    //     msg >> json_str;
-    //     ok("Hello from [%d], %s", clientId, json_str.c_str());
-    //   }
-    //   }
-    // }
+    if (!c.InComing().empty())
+    {
+      // 将亡值 move 延长生命周期
+      auto msg = c.InComing().pop_front().msg;
+      switch (msg.header.id)
+      {
+      case CustomMsgType::ServerPing:
+      {
+        std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
+        std::chrono::system_clock::time_point timeLast;
+        msg >> timeLast;
+        ok("Server ping: %lf", std::chrono::duration<double>(timeNow - timeLast).count());
+        break;
+      }
+      case CustomMsgType::ServerMessage:
+      {
+        uint32_t clientId;
+        std::string json_str;
+        msg >> clientId;
+        msg >> json_str;
+        ok("Hello from [%d], %s", clientId, json_str.c_str());
+      }
+      }
+    }
   }
 
   return 0;

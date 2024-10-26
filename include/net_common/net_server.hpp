@@ -78,6 +78,7 @@ namespace net
 
     virtual ~server_interface()
     {
+      Close();
       io_context_pool::Instance()->Join();
       logger::terminate();
       if (t_log.joinable())
@@ -89,6 +90,8 @@ namespace net
     // 注意 close 之后必须进行析构
     void Close()
     {
+      if (will_closed)
+        return;
       will_closed = true;
       // 关闭全部连接
       for (auto item : m_connections)

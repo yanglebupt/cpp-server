@@ -62,7 +62,7 @@ struct logger_config
   // 当 log 很大时，是否拆分成多个小份存到不同的文件
   bool split_log = false;
   // 是否由外部线程/池控制打印和输出日志文件
-  bool external_log = true;
+  bool external_log = false;
 
   // 默认保存路径在根目录下的 logs 文件夹
   char *save_dir = (char *)"./logs";

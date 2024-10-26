@@ -15,6 +15,7 @@ namespace net
     friend class client_connection<T>;
 
   private:
+    bool will_stopped = false;
     asio::ip::tcp::resolver::results_type endpoints;
     std::thread t_log;
 
@@ -40,6 +41,7 @@ namespace net
 
     virtual ~client_interface()
     {
+      Stop();
       // 因为读失败，不会继续添加读任务，写队列为空，也不会添加写任务，因此 io_context 会直接退出，不需要手动调用 stop
       // 注意不能在线程注册任务的回调函数里面，调用 join 函数, 也就是自己 join 自己，或者两个或多个线程互相 join
       if (ctx_thread.joinable())
@@ -106,6 +108,9 @@ namespace net
   protected:
     void Stop()
     {
+      if (will_stopped)
+        return;
+      will_stopped = true;
       m_connection.reset();
       ctx.stop();
       OnDisConnect();
