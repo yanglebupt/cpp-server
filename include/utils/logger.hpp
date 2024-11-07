@@ -265,7 +265,6 @@ private:
           err("mkdir %s failed", cfg.save_dir);
       if (cfg.save_override)
       {
-        // 必须要写入 << 然后及时 close/flush ，才会出现新建的文件
         log_filename = format_str("%s/%s.txt", cfg.save_dir, cfg.save_filename);
         fw = std::ofstream(log_filename, std::ios::trunc);
       }
@@ -336,6 +335,7 @@ private:
     return str;
   }
 
+  // 可变参模板展开：https://blog.csdn.net/Long_xu/article/details/129003322
   // 输出打印内容
   static void output_to() {}
 
@@ -353,6 +353,7 @@ private:
       if (cfg.split_log && fw.tellp() >= cfg.logfile_max_size)
         create_log_file();
 
+      // 必须要写入 << 然后及时 close/flush ，才会出现新建的文件，并且更新 fw.tellp() 到末尾
       fw << message;
       fw.flush();
     }
