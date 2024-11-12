@@ -27,13 +27,13 @@ protected:
     {
     case CustomMsgType::ServerPing:
     {
-      ok("[%d] Server ping", client->GetID());
+      info("[%d] Server ping", client->GetID());
       client->Send(msg);
       break;
     }
     case CustomMsgType::MessageAll:
     {
-      ok("[%d] MessageAll", client->GetID());
+      info("[%d] MessageAll", client->GetID());
       net::message<CustomMsgType> back_msg;
       back_msg.header.id = CustomMsgType::ServerMessage;
       back_msg << msg;

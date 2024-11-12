@@ -140,7 +140,7 @@ int main()
         std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
         std::chrono::system_clock::time_point timeLast;
         msg >> timeLast;
-        ok("Server ping: %lf", std::chrono::duration<double>(timeNow - timeLast).count());
+        info("Server ping: %lf", std::chrono::duration<double>(timeNow - timeLast).count());
         break;
       }
       case CustomMsgType::ServerMessage:
@@ -149,7 +149,7 @@ int main()
         std::string json_str;
         msg >> clientId;
         msg >> json_str;
-        ok("Hello from [%d], %s", clientId, json_str.c_str());
+        info("Hello from [%d], %s", clientId, json_str.c_str());
       }
       }
     }

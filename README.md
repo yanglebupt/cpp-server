@@ -6,6 +6,10 @@
 
 ![](./imgs/Message.png)
 
+## 更一般的设计
+
+![](./imgs/SM.png)
+
 # 服务端和客户端发送和接收消息模式
 
 我们采用的方法是 <font color="red"><b>轮询消息队列，并进行处理</b></font>
@@ -43,7 +47,7 @@
 
 - 抽象打印类 `Logger`，方便控制打印行为，打印太多也会影响性能（dev 模式开启打印，production 模式关闭打印，通过编译选项实现），后面容易扩展 Log 输出到文件中
 
-- 提供了 `c++/node/c#` 的连接客户端，推荐看 node 的客户端，会对协程 `async/await` 以及大小端有清晰的认知
+- 提供了 [c++](./include/net_common/net_client.hpp)/[node](./include/net_common/nodejs/)/[c#](https://github.com/yanglebupt/YLCommon/tree/master/Network) 的连接客户端，推荐看 node 的客户端，会对协程 `async/await` 以及大小端有清晰的认知
 
 ## Questions ?
 
@@ -85,11 +89,17 @@
 
 ### 序列化
 
-序列化更复杂的对象：`json/protobuf`，现在 `message` 已经支持直接写/读 `struct/json/string` 了，后续在 RPC 里面，将会支持 `protobuf`
+序列化的方式有很多种，[json、protobuf、message/memory pack](https://blog.csdn.net/weixin_41316824/article/details/141679948)
 
-### 字节序处理
+目前简单实现了一个二进制序列化，类似于 Message Pack 的方式，支持序列化容器、对象，支持配置大小端序列化和反序列化
 
-不同机器的字节序处理（大小端转换）？统一采用网络字节流大端
+![](./imgs/Serialization.png)
+
+注意：这种方式不支持容器的嵌套
+
+#### 字节序处理
+
+不同机器的字节序处理（大小端转换）统一采用网络字节流大端
 
 ## 多线程模型
 

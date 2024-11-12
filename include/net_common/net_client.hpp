@@ -66,7 +66,7 @@ namespace net
         m_connection = std::make_shared<client_connection<T>>(this, asio::ip::tcp::socket(ctx), message_in_dq);
         m_connection->ConnectToServer(endpoints, max_retries, retry_wait_ms);
 
-        ok("Start Connecting...");
+        info("Start Connecting...");
 
         // 开始异步操作
         ctx_thread = std::thread([this]()

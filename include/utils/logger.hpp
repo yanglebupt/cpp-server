@@ -23,14 +23,15 @@
 #define WHITE "\033[37m"   /* White */
 
 // 可变长参数，支持格式化字符串输入
-#define info(format, ...) logger::color_log(WHITE, log_level::info, format, ##__VA_ARGS__);
+#define debug(format, ...) logger::color_log(BLUE, log_level::debug, format, ##__VA_ARGS__);
+#define info(format, ...) logger::color_log(GREEN, log_level::info, format, ##__VA_ARGS__);
 #define warn(format, ...) logger::color_log(YELLOW, log_level::warn, format, ##__VA_ARGS__);
 #define err(format, ...) logger::color_log(RED, log_level::error, format, ##__VA_ARGS__);
-#define ok(format, ...) logger::color_log(GREEN, log_level::info, format, ##__VA_ARGS__);
 #define color(color, format, ...) logger::color_log(color, log_level::info, format, ##__VA_ARGS__);
 
 enum log_level
 {
+  debug,
   info,
   warn,
   error,
@@ -40,7 +41,7 @@ enum log_level
 struct logger_config
 {
   inline static char *log_level_name[log_level::level_count] = {
-      (char *)"Info", (char *)"Warn", (char *)"Error"};
+      (char *)"Debug", (char *)"Info", (char *)"Warn", (char *)"Error"};
   inline static int timestr_max_length = 45;
 
   // 是否开启 log

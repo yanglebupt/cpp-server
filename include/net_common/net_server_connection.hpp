@@ -57,7 +57,7 @@ namespace net
         if (!ec) {
           if (validation_ok)
           {
-            ok("[%d] Validation OK", self->id);
+            info("[%d] Validation OK", self->id);
             self->server->AddClient(self->share());
             self->server->OnClientValidated(self->share());
             self->ReadHeader();
@@ -103,7 +103,7 @@ namespace net
                         {
         if (!ec) {
           if (accepted) {
-            ok("[%d] Connection Approved", self->id);
+            info("[%d] Connection Approved", self->id);
             // 开始验证
             self->UpdateValidation();
             // 需要向客户端发送验证码

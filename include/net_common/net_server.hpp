@@ -47,7 +47,7 @@ namespace net
           asio::ip::tcp::endpoint ed = socket.remote_endpoint();
           std::ostringstream address;
           address << ed;
-          ok("[SERVER] New Connection: %s", address.str().c_str());
+          info("[SERVER] New Connection: %s", address.str().c_str());
           // 这个 client 需要保留下来，后面服务器响应的时候要用到
           std::shared_ptr<server_connection<T>>
               client = std::make_shared<server_connection<T>>(this, std::move(socket), this->InComing());
@@ -120,7 +120,7 @@ namespace net
         // 由于我们在回调函数里面，又注册了任务，因此 io_context 不会 stop 下来，除非你手动调用 stop
         WaitForClientConnection();
 
-        ok("[SERVER] Started! %d threads handle", io_context_pool::Instance()->size);
+        info("[SERVER] Started! %d threads handle", io_context_pool::Instance()->size);
 
         // 主线程堵塞
         ctx.run();

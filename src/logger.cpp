@@ -20,9 +20,9 @@ int main()
                 { err("Mike %s %d", "Jack", 32); });
 
   err("Mike %s %d", "Jack", 32);
-  info("Jack");
+  debug("Jack");
 
-  ok("Mike %s %d", "Jack", 32);
+  info("Mike %s %d", "Jack", 32);
   color(MAGENTA, "Jack");
 
   logger::terminate();

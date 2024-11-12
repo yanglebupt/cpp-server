@@ -25,7 +25,7 @@ namespace net
         if (!ec) {
           if (self->accepted)
           {
-            ok("Server accepted");
+            info("Server accepted");
             // 开始验证
             self->ReadValidation();
           }
@@ -47,7 +47,7 @@ namespace net
         if (!ec) {
           if (self->validation_ok)
           {
-            ok("Server validated");
+            info("Server validated");
             self->client->Connected();
             self->ReadHeader();
           }
