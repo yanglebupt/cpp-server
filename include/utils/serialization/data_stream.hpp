@@ -108,16 +108,24 @@ public:
   void write_args(const T &value, const Args &...args)
   {
     write(value);
-    write(args...);
+    write_args(args...);
   }
-  void write_args() {};
+  template <typename T>
+  void write_args(const T &value)
+  {
+    write(value);
+  };
   template <typename T, typename... Args>
   void read_args(T &value, Args &...args)
   {
     read(value);
-    read(args...);
+    read_args(args...);
   }
-  void read_args() {};
+  template <typename T>
+  void read_args(T &value)
+  {
+    read(value);
+  };
 
   // write stream
   template <typename T>
@@ -183,12 +191,32 @@ public:
     return out << stream.buffer;
   }
 
+  // 继承的方法
   void clear()
   {
     buffer.clear();
+    std::vector<byte_t>().swap(buffer);
+    rpos = 0;
   }
 
-private:
+  virtual byte_buffer &get_buffer()
+  {
+    return buffer;
+  }
+
+  Endian get_endian()
+  {
+    return buffer.endian;
+  }
+
+  void set_from_buffer(const std::vector<byte_t> &data)
+  {
+    len_t size = data.size();
+    buffer.resize(size);
+    memcpy(buffer.data(), data.data(), size);
+  }
+
+protected:
   len_t rpos = 0;
   byte_buffer buffer;
 };

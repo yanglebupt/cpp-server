@@ -20,7 +20,7 @@ inline constexpr bool is_primitive_type_v = std::is_same_v<T, bool> ||
                                             std::is_same_v<T, int16_t> || std::is_same_v<T, uint16_t> ||
                                             std::is_same_v<T, int32_t> || std::is_same_v<T, uint32_t> ||
                                             std::is_same_v<T, int64_t> || std::is_same_v<T, uint64_t> ||
-                                            std::is_same_v<T, float> || std::is_same_v<T, double>;
+                                            std::is_same_v<T, float> || std::is_same_v<T, double> || std::is_enum_v<T>;
 
 enum Endian
 {
@@ -60,15 +60,18 @@ public:
       }
       return len;
     }
-    return -1;
+    else
+      throw std::runtime_error("byte buffer only support read primitive type!");
   };
 
-  // 写入基本数据类型
+  // 写入基本数据类型，offset -1 代表在末尾写入
   template <typename T>
   void write(T data, len_t offset = -1)
   {
     if constexpr (is_primitive_type_v<T>)
       write((byte_t *)&data, offset, sizeof(T));
+    else
+      throw std::runtime_error("byte buffer only support read primitive type!");
   };
 
   // 打印
@@ -125,7 +128,7 @@ protected:
   Endian endian;
   int print_max_bytes = 30;
 
-  // 偏移写入多少个字节
+  // 偏移写入多少个字节，offset -1 代表在末尾写入
   void write(byte_t *data, len_t offset, len_t len, bool need_check_endian = true)
   {
     // 翻转
