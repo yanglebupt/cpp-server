@@ -204,7 +204,7 @@ struct logger
       logger_tasks.wait();
       if (logger_tasks.exited)
       {
-        while (logger_tasks.size() > 0)
+        while (!logger_tasks.empty())
         {
           logger_task lt = logger_tasks.pop_front();
           output_lines(lt.clr, lt.lines);
@@ -218,7 +218,7 @@ struct logger
 
   static void terminate()
   {
-    logger_tasks.try_exit();
+    logger_tasks.exit();
   }
 
 private:

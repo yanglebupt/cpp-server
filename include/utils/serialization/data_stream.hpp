@@ -7,9 +7,45 @@
 
 class data_stream
 {
+private:
+  void __init__(const data_stream &other)
+  {
+    rpos = other.rpos;
+    buffer = other.buffer;
+  };
+
+  void __init__(data_stream &&other)
+  {
+    rpos = other.rpos;
+    other.rpos = 0;
+    buffer = std::move(other.buffer);
+  };
+
 public:
   data_stream() : buffer(device_endian) {}
   data_stream(Endian endian) : buffer(endian) {}
+  ~data_stream() {}
+
+  data_stream(const data_stream &other)
+  {
+    __init__(other);
+  }
+  data_stream &operator=(const data_stream &other)
+  {
+    if (&other != this)
+      __init__(other);
+    return *this;
+  }
+  data_stream(data_stream &&other)
+  {
+    __init__(std::forward<data_stream>(other));
+  }
+  data_stream &operator=(data_stream &&other)
+  {
+    if (&other != this)
+      __init__(std::forward<data_stream>(other));
+    return *this;
+  }
 
   // 基本数据类型
   template <typename T>
@@ -131,7 +167,14 @@ public:
   template <typename T>
   data_stream &operator<<(T data)
   {
-    if constexpr (std::is_base_of_v<serializable, T>)
+    if constexpr (std::is_base_of_v<byte_buffer, T>)
+    {
+      len_t o_size = buffer.size();
+      len_t n_size = data.size();
+      buffer.resize(o_size + n_size);
+      memcpy(buffer.data() + o_size, data.data(), n_size);
+    }
+    else if constexpr (std::is_base_of_v<serializable, T>)
       write(dynamic_cast<serializable &>(data));
     else
       write(data);

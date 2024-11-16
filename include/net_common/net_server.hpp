@@ -15,6 +15,7 @@ namespace net
 
   private:
     std::thread t_log;
+    std::mutex stop_mtx;
     bool will_closed = false;
 
     void AddClient(std::shared_ptr<server_connection<T>> client)
@@ -80,19 +81,19 @@ namespace net
     {
       Close();
       io_context_pool::Instance()->Join();
-      logger::terminate();
       if (t_log.joinable())
         t_log.join();
       logger::cfg.external_log = false;
       warn("[SERVER] Stop!");
     }
 
-    // 注意 close 之后必须进行析构
     void Close()
     {
+      std::unique_lock<std::mutex> lock(stop_mtx);
       if (will_closed)
         return;
       will_closed = true;
+      this->Exit();
       // 关闭全部连接
       for (auto item : m_connections)
       {
@@ -102,6 +103,7 @@ namespace net
       m_connections.clear();
       ctx.stop();
       io_context_pool::Instance()->Stop();
+      logger::terminate();
     }
 
     void Start()
@@ -138,15 +140,56 @@ namespace net
       return m_connections.size();
     }
 
-    void SendMessageAllClients(const message<T> &msg, std::shared_ptr<server_connection<T>> ignoreClient)
+    void SendAll(const message<T> &msg, uint32_t ignoreClientID)
     {
       for (const std::pair<uint32_t, std::shared_ptr<server_connection<T>>> &pair : m_connections)
       {
         std::shared_ptr<server_connection<T>> client = pair.second;
-        if (ignoreClient == nullptr || (client == ignoreClient && client->GetID() == ignoreClient->GetID()))
-          continue;
-        client->Send(msg, false);
+        if (client->GetID() != ignoreClientID)
+          client->Send(msg);
       }
+    }
+
+    void SendAll(const byte_buffer &msg, uint32_t ignoreClientID)
+    {
+      for (const std::pair<uint32_t, std::shared_ptr<server_connection<T>>> &pair : m_connections)
+      {
+        std::shared_ptr<server_connection<T>> client = pair.second;
+        if (client->GetID() != ignoreClientID)
+          client->Send(msg);
+      }
+    }
+
+    void SendAll(const message<T> &msg)
+    {
+      for (const std::pair<uint32_t, std::shared_ptr<server_connection<T>>> &pair : m_connections)
+        pair.second->Send(msg);
+    }
+
+    void SendAll(const byte_buffer &msg)
+    {
+      for (const std::pair<uint32_t, std::shared_ptr<server_connection<T>>> &pair : m_connections)
+        pair.second->Send(msg);
+    }
+
+    void SendTo(uint32_t clientID, const message<T> &msg)
+    {
+      if (m_connections.count(clientID) < 1)
+      {
+        warn("Client [%d] not existed", clientID);
+      }
+      else
+        m_connections.at(clientID)->Send(msg);
+    }
+
+    void SendTo(uint32_t clientID, const byte_buffer &msg)
+    {
+      if (m_connections.count(clientID) < 1)
+      {
+        warn("Client [%d] not existed", clientID);
+      }
+      else
+        m_connections.at(clientID)->Send(msg);
     }
 
     /*--------------- 一些回调函数，不同的业务服务，可以有不同的回调函数 ----------------*/

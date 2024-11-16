@@ -10,7 +10,7 @@ constexpr uint32_t get_size_of(const Args &...args)
 }
 
 #define SERIALIZE(...)                                       \
-  const uint32_t __size = get_size_of(__VA_ARGS__);          \
+  uint32_t __size = get_size_of(__VA_ARGS__);                \
   virtual void serialize(data_stream &stream) const override \
   {                                                          \
     stream.write_args(__VA_ARGS__);                          \

@@ -1,229 +1,131 @@
 #pragma once
 
-#include <stddef.h>
-#include <ostream>
-#include <vector>
-#include <cstring>
-#include <memory>
-#include <iostream>
-#include <type_traits>
-#include <stdexcept>
+#include "../utils/serialization/serializable.hpp"
+#include "../utils/serialization/data_stream.hpp"
 #include "../utils/owned_message_interface.hpp"
-#include "json/json.h"
 
 namespace net
 {
-  class message_io_error : public std::exception
+  struct header : public serializable
+  {
+    // body size in bytes
+    len_t size = 0;
+  };
+
+  // T must extend from header
+  template <typename T>
+  struct message : public data_stream
   {
   private:
-    std::string __arg;
-
-  public:
-    message_io_error(const std::string &__arg) : __arg(__arg) {}
-    const char *what() const throw() override
-    {
-      std::string message = "bad message io exception: ";
-      message += __arg;
-      return message.c_str();
-    }
-  };
-  /**
-   * 消息头
-   */
-  template <typename T>
-  struct message_header
-  {
-    /**
-     * 消息类型
-     */
-    T id;
-    /**
-     * 整个消息包体的 bytes，不包括消息头
-     */
-    uint32_t size = 0;
-  };
-
-  template <typename T>
-  /**
-   * 服务端和客户端传递的消息包
-   */
-  struct message
-  {
-    /**
-     * 消息头
-     */
-    message_header<T> header;
-    /**
-     * 消息体
-     */
-    std::vector<uint8_t> body;
-
-    inline static Json::FastWriter __json_writer = Json::FastWriter();
-    inline static Json::Reader __json_reader = Json::Reader();
-
-    void clear()
-    {
-      body.clear();
-      std::vector<uint8_t>().swap(body);
-      header.size = 0;
-    }
-
-    message() {}
-    message(const message<T> &other)
+    void __init__(const message<T> &other)
     {
       header = other.header;
       body = other.body;
-    }
-    message<T> &operator=(const message<T> &other)
-    {
-      if (&other != this)
-      {
-        header = other.header;
-        body = other.body;
-      }
-      return *this;
-    }
-    message(message<T> &&other)
+    };
+
+    void __init__(message<T> &&other)
     {
       header = other.header;
       other.header.size = 0;
       body = std::move(other.body);
+    };
+
+  protected:
+    data_stream body;
+    bool has_write_buffer = false;
+
+  public:
+    // struct 字节数：https://blog.csdn.net/liunanya/article/details/102863416/
+    // 字节序对齐问题：https://blog.csdn.net/qq_26460507/article/details/77620523
+    // 序列化 header: serializable 是不包含为了字节对齐而填充的字节
+    T header;
+
+    message() : data_stream(), body() {}
+    message(Endian endian) : data_stream(endian), body(endian) {}
+
+    message(const message<T> &other)
+    {
+      __init__(other);
+    }
+    message<T> &operator=(const message<T> &other)
+    {
+      if (&other != this)
+        __init__(other);
+      return *this;
+    }
+    message(message<T> &&other)
+    {
+      __init__(std::forward<message<T>>(other));
     }
     message<T> &operator=(message<T> &&other)
     {
       if (&other != this)
-      {
-        header = other.header;
-        other.header.size = 0;
-        body = std::move(other.body);
-      }
+        __init__(std::forward<message<T>>(other));
       return *this;
     }
 
-    // 返回消息包体的 bytes
-    size_t size() const
+    void set_header_from_buffer(const std::vector<byte_t> &data)
     {
-      return body.size();
+      data_stream ds(get_endian());
+      ds.set_from_buffer(data);
+      ds >> this->header;
+      body.get_buffer().resize(header.size);
     }
 
-    // print
-    friend std::ostream &operator<<(std::ostream &os, const message &message)
+    void set_body_from_buffer(const std::vector<byte_t> &data)
     {
-      os << "ID: " << int(message.header.id) << ", Size: " << message.header.size;
-      return os;
+      body.set_from_buffer(data);
     }
 
-    /**
-     * write data to message body data tail, type <DataType> must simple so that it can be serialized
-     * sizeof(<DataType>) must be the contiguous memory size occupied by the data
-     * example:
-     * >>> message<T> msg;
-     * >>> msg << 1 << 0 << "sdsd";
-     **/
-    template <typename DataType>
-    friend message<T> &operator<<(message<T> &msg, const DataType &data)
+    // B must extend from serializable
+    template <typename B>
+    void operator=(B obj)
     {
-      if constexpr (std::is_same<DataType, std::string>::value ||
-                    std::is_same<DataType, std::vector<uint8_t>>::value ||
-                    std::is_same<DataType, std::vector<char>>::value)
-      {
-        msg.body.insert(msg.body.end(), data.begin(), data.end());
-        msg.header.size = msg.size();
-        return msg;
-      }
-      else if constexpr (std::is_same<DataType, message<T>>::value)
-      {
-        msg.body.insert(msg.body.end(), data.body.begin(), data.body.end());
-        msg.header.size = msg.size();
-        return msg;
-      }
-      else if constexpr (std::is_same<DataType, Json::Value>::value)
-      {
-        std::string str = message<T>::__json_writer.write(data);
-        msg.body.insert(msg.body.end(), str.begin(), str.end());
-        msg.header.size = msg.size();
-        return msg;
-      }
-      else
-      {
-        // char[n] ，char[]，char* 不是一个类型
-        // DataType 如果是 char[n]，那么 sizeof(DataType) 可以获取正常大小。但是不能是 char*
-        static_assert(std::is_standard_layout<DataType>::value, "Data is too complex and it cannot be serialized");
-        // 不允许指针类型
-        static_assert(!std::is_pointer<DataType>::value, "Can't append data in message by a pointer");
-
-        size_t ori_body_size = msg.body.size();
-
-        // increment body data size
-        size_t new_body_size = ori_body_size + sizeof(DataType);
-        msg.body.resize(new_body_size);
-
-        // .data() return start pointer
-        // + ori_body_size (offset) is the end pointer, &data return the data start pointer
-        std::memcpy(msg.body.data() + ori_body_size, &data, sizeof(DataType));
-
-        // recalculate the total message size
-        msg.header.size = msg.size();
-
-        return msg;
-      }
+      body.clear();
+      body << obj;
+      header.size = body.get_buffer().size();
     }
 
-    /**
-     * fetch data from message body data tail, type <DataType> must simple so that it can be serialized
-     * sizeof(<DataType>) must be the contiguous memory size occupied by the data
-     * example:
-     * >>> message<T> msg;
-     * >>> float x, y;
-     * >>> msg >> x >> y;
-     **/
-    template <typename DataType>
-    friend message<T> &operator>>(message<T> &msg, DataType &data)
+    // B must extend from serializable
+    template <typename B>
+    message<T> &operator<<(B obj)
     {
-      // 将剩余数据全部取出来
-      if constexpr (std::is_same<DataType, std::string>::value ||
-                    std::is_same<DataType, std::vector<uint8_t>>::value ||
-                    std::is_same<DataType, std::vector<char>>::value)
-      {
-        data.resize(msg.body.size());
-        std::memcpy(data.data(), msg.body.data(), msg.body.size());
-        msg.clear();
-        return msg;
-      }
-      else if constexpr (std::is_same<DataType, message<T>>::value)
-      {
-        msg.body.swap(data.body);
-        msg.clear();
-        return msg;
-      }
-      else if constexpr (std::is_same<DataType, Json::Value>::value)
-      {
-        std::string str;
-        str.resize(msg.body.size());
-        std::memcpy(str.data(), msg.body.data(), msg.body.size());
-        message<T>::__json_reader.parse(str, data);
-        msg.clear();
-        return msg;
-      }
-      else
-      {
-        static_assert(std::is_standard_layout<DataType>::value, "Data is too complex and it cannot be serialized");
-        static_assert(!std::is_pointer<DataType>::value, "Can't append data in message by a pointer");
+      body << obj;
+      header.size = body.get_buffer().size();
+      return *this;
+    }
 
-        size_t ori_body_size = msg.body.size();
+    template <typename B>
+    message<T> &operator>>(B &obj)
+    {
+      body >> obj;
+      return *this;
+    }
 
-        // reduce body data size
-        size_t new_body_size = ori_body_size - sizeof(DataType);
+    // 确保所有的更新在 get_buffer 之前，可以做监听 body 的变化，但是没法监听 header 的变化
+    byte_buffer &get_buffer() override
+    {
+      if (has_write_buffer)
+        return buffer;
+      data_stream::operator<<(header);
+      len_t header_size = header.__size;
+      if (buffer.size() != header_size)
+        throw std::runtime_error("header must be struct with primitive type");
+      buffer.resize(header_size + header.size);
+      memcpy(buffer.data() + header_size, body.get_buffer().data(), header.size);
+      has_write_buffer = true;
+      return buffer;
+    }
 
-        std::memcpy(&data, msg.body.data() + new_body_size, sizeof(DataType));
+    // header size in bytes
+    len_t get_header_size()
+    {
+      return header.__size;
+    }
 
-        msg.body.resize(new_body_size);
-
-        // recalculate the total message size
-        msg.header.size = msg.size();
-
-        return msg;
-      }
+    byte_buffer &get_body_buffer()
+    {
+      return body.get_buffer();
     }
   };
 

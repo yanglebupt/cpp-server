@@ -18,6 +18,7 @@ namespace net
     bool will_stopped = false;
     asio::ip::tcp::resolver::results_type endpoints;
     std::thread t_log;
+    std::mutex stop_mtx;
 
   public:
     // 0 代表不进行重连
@@ -42,11 +43,11 @@ namespace net
     virtual ~client_interface()
     {
       Stop();
+      logger::terminate();
       // 因为读失败，不会继续添加读任务，写队列为空，也不会添加写任务，因此 io_context 会直接退出，不需要手动调用 stop
       // 注意不能在线程注册任务的回调函数里面，调用 join 函数, 也就是自己 join 自己，或者两个或多个线程互相 join
       if (ctx_thread.joinable())
         ctx_thread.join();
-      logger::terminate();
       if (t_log.joinable())
         t_log.join();
       logger::cfg.external_log = false;
@@ -90,13 +91,13 @@ namespace net
     void Send(const message<T> &msg)
     {
       if (m_connection != nullptr)
-        m_connection->Send(msg, false);
+        m_connection->Send(msg);
     }
 
-    void Send(message<T> &&msg)
+    void Send(const byte_buffer &msg)
     {
       if (m_connection != nullptr)
-        m_connection->Send(msg, true);
+        m_connection->Send(msg);
     }
 
     tsqueue<owned_message<T, client_connection<T>>> &InComing()
@@ -108,6 +109,7 @@ namespace net
   protected:
     void Stop()
     {
+      std::unique_lock<std::mutex> lock(stop_mtx);
       if (will_stopped)
         return;
       will_stopped = true;

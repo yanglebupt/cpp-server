@@ -5,32 +5,31 @@
 #include "common.cpp"
 #include "json/json.h"
 #include <iostream>
-#include <conio.h>
-#include <functional>
 #include <iterator>
 #include <regex>
 
-class CustomClient : public net::client_interface<CustomMsgType>
+Json::FastWriter json_writer = Json::FastWriter();
+
+class CustomClient : public net::client_interface<custom_header>
 {
 public:
-  CustomClient() : net::client_interface<CustomMsgType>() {};
-  CustomClient(int max_retries) : net::client_interface<CustomMsgType>(max_retries) {};
+  CustomClient() : net::client_interface<custom_header>() {};
+  CustomClient(int max_retries) : net::client_interface<custom_header>(max_retries) {};
 
   void PingServer()
   {
-    net::message<CustomMsgType> msg;
+    net::message<custom_header> msg;
     msg.header.id = CustomMsgType::ServerPing;
     // 发送报文的时间
-    std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
-    msg << timeNow;
+    msg << std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
     Send(std::move(msg));
   }
 
   void MessageAll(const Json::Value &json)
   {
-    net::message<CustomMsgType> msg;
+    net::message<custom_header> msg;
     msg.header.id = CustomMsgType::MessageAll;
-    msg << json;
+    msg << json_writer.write(json);
     Send(std::move(msg));
   }
 
@@ -38,37 +37,6 @@ protected:
   virtual void OnDisConnect() override
   {
     warn("Disconnect");
-  }
-};
-
-class CMDInputListener
-{
-private:
-  std::string line;
-
-public:
-  // 通过回调函数监听并处理每一行输入，回调不允许是异步函数
-  void operator()(std::function<void(const std::string &)> _Line_Callback, bool hidden = false, std::function<void(char, const std::string &)> _Char_Callback = nullptr)
-  {
-    char ch;
-    if (_kbhit())
-    {                // 检查是否有输入
-      ch = _getch(); // 获取输入字符
-      if (ch == 13)
-      {
-        std::cout << std::endl;
-        _Line_Callback(line);
-        line.clear();
-      }
-      else
-      {
-        if (!hidden)
-          std::cout << ch;
-        if (_Char_Callback != nullptr)
-          _Char_Callback(ch, line);
-        line += ch;
-      }
-    }
   }
 };
 
@@ -90,7 +58,7 @@ int main()
   std::cout << "Press 2: Send Json Message to All Other Clients" << std::endl;
   std::cout << "Press 3: Exit" << std::endl;
 
-  CustomClient c(5);
+  CustomClient &c = (*new CustomClient(5));
   c.Connect("127.0.0.1", 5050);
 
   bool exit_flag = false;
@@ -110,7 +78,11 @@ int main()
       c.MessageAll(root);
     }
     if (command == '3')
-      c.Close();
+    {
+      delete &c;
+      // exit_flag = true;
+      // c.Close();
+    }
   };
 
   auto char_callback = [&](char ch, const std::string &line)
@@ -137,10 +109,10 @@ int main()
       {
       case CustomMsgType::ServerPing:
       {
-        std::chrono::system_clock::time_point timeNow = std::chrono::system_clock::now();
-        std::chrono::system_clock::time_point timeLast;
+        double timeLast;
         msg >> timeLast;
-        info("Server ping: %lf", std::chrono::duration<double>(timeNow - timeLast).count());
+        double timeNow = std::chrono::duration<double>(std::chrono::system_clock::now().time_since_epoch()).count();
+        info("Server ping: %5f", (timeNow - timeLast));
         break;
       }
       case CustomMsgType::ServerMessage:

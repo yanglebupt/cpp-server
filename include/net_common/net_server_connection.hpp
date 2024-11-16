@@ -117,5 +117,35 @@ namespace net
           self->OnError(error_code::write_accepted_error);
         } });
     };
+
+    void SendAll(const message<T> &msg, uint32_t ignoreClientID)
+    {
+      server->SendAll(msg, ignoreClientID);
+    }
+
+    void SendAll(const byte_buffer &msg, uint32_t ignoreClientID)
+    {
+      server->SendAll(msg, ignoreClientID);
+    }
+
+    void SendAll(const message<T> &msg)
+    {
+      server->SendAll(msg);
+    }
+
+    void SendAll(const byte_buffer &msg)
+    {
+      server->SendAll(msg);
+    }
+
+    void SendTo(uint32_t clientID, const message<T> &msg)
+    {
+      server->SendTo(clientID, msg);
+    }
+
+    void SendTo(uint32_t clientID, const byte_buffer &msg)
+    {
+      server->SendTo(clientID, msg);
+    }
   };
 }

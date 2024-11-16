@@ -4,7 +4,6 @@
 #include <deque>
 #include <stddef.h>
 #include <condition_variable>
-#include <iostream>
 
 /**
  * thread safe queue
@@ -26,10 +25,9 @@ public:
 
   ~tsqueue()
   {
+    exit();
     clear();
     std::deque<T>().swap(dq);
-    try_exit();
-    // std::cout << "tsqueue free" << std::endl;
   };
 
   // 这里能返回引用吗？
@@ -94,8 +92,9 @@ public:
     }
   }
 
-  void try_exit()
+  void exit()
   {
+    std::unique_lock<std::mutex> lock(_mutex);
     if (exited)
       return;
     exited = true;

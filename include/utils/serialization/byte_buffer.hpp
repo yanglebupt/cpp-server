@@ -40,10 +40,49 @@ static Endian device_endian = get_device_endian();
 
 class byte_buffer : public std::vector<byte_t>
 {
+private:
+  void __init__(const byte_buffer &other)
+  {
+    endian = other.endian;
+    print_max_bytes = other.print_max_bytes;
+    len_t size = other.size();
+    this->resize(size);
+    memcpy(this->data(), other.data(), size);
+  };
+
+  void __init__(byte_buffer &&other)
+  {
+    __init__(other);
+    other.clear();
+    std::vector<byte_t>().swap(other);
+  };
+
 public:
   friend class data_stream;
   byte_buffer() : endian(device_endian) {}
   byte_buffer(Endian endian) : endian(endian) {}
+  ~byte_buffer() {}
+
+  byte_buffer(const byte_buffer &other)
+  {
+    __init__(other);
+  }
+  byte_buffer &operator=(const byte_buffer &other)
+  {
+    if (&other != this)
+      __init__(other);
+    return *this;
+  }
+  byte_buffer(byte_buffer &&other)
+  {
+    __init__(std::forward<byte_buffer>(other));
+  }
+  byte_buffer &operator=(byte_buffer &&other)
+  {
+    if (&other != this)
+      __init__(std::forward<byte_buffer>(other));
+    return *this;
+  }
 
   // 读取基本数据
   template <typename T>

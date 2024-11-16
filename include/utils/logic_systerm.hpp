@@ -55,13 +55,15 @@ public:
     return message_in_dq;
   }
 
-  virtual ~logic_system()
+  void Exit()
   {
     // 通知队列不要等待了
-    message_in_dq.try_exit();
+    message_in_dq.exit();
     // 等待剩余消息处理完毕
     if (message_thread.joinable())
       message_thread.join();
     warn("[SERVER] Logic Systerm Exited!");
-  };
+  }
+
+  virtual ~logic_system() {};
 };

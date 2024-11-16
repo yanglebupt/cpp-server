@@ -46,7 +46,7 @@ namespace net
     asio::ip::tcp::socket socket;
     // This queue holds all messages to be sent to the remote side of this connection
     // 确保顺序发送
-    tsqueue<message<T>> message_out_dq;
+    tsqueue<byte_buffer> message_out_dq;
     // This references the incoming queue of the owner of connection, we will push received message into this queue
     tsqueue<owned_message<T, Connection>> &message_in_dq;
 
@@ -54,6 +54,7 @@ namespace net
     uint32_t id = 0;
 
     connection_state con_state;
+    std::mutex shutdown_mtx;
     bool has_shutdown_send = false;
 
     // "Encrypt" Validation data
@@ -64,43 +65,18 @@ namespace net
       return out ^ 0xC0DEFACE12345678;
     }
 
-    void WriteHeader()
+    void Write()
     {
-      // 这里不能使用局部变量，局部变量在异步可能释放，但是这里会出现频繁取第一个元素，导致多次拷贝
-      // 由于这里只涉及从队列读数据，不存在竞争问题，因此队列返回引用即可
-      asio::async_write(socket, asio::buffer(&message_out_dq.front().header, sizeof(message_header<T>)), [self = this->shared_from_this()](std::error_code ec, std::size_t length)
-                        {
-        if (!ec) {
-          if (self->message_out_dq.front().body.size() > 0)
-          {
-            // 有 body
-            self->WriteBody();
-          }
-          else
-          {
-            // 无 body，写完毕
-            self->message_out_dq.remove_front();
-            if (!self->message_out_dq.empty())
-              self->WriteHeader();
-          }
-        } else {
-          err("[%d] Write Header Failed", self->id);
-          self->OnError(error_code::write_header_error);
-        } });
-    };
-
-    void WriteBody()
-    {
-      asio::async_write(socket, asio::buffer(message_out_dq.front().body.data(), message_out_dq.front().body.size()), [self = this->shared_from_this()](std::error_code ec, std::size_t length)
+      asio::async_write(socket, asio::buffer(message_out_dq.front().data(), message_out_dq.front().size()), [self = this->shared_from_this()](std::error_code ec, std::size_t length)
                         {
         if (!ec) {
           self->message_out_dq.remove_front();
           if (!self->message_out_dq.empty())
-            self->WriteHeader();
+            self->Write();
           else if (self->con_state == connection_state::halfclosed)
             self->ShutdownSend();
         } else {
-          err("[%d] Write Body Failed", self->id);
+          err("[%d] Write Message Pack Failed", self->id);
           self->OnError(error_code::write_body_error);
         } });
     };
@@ -113,20 +89,18 @@ namespace net
       // 例如出现错误的时候，需要手动 delete，但是智能指针的话，如果在回调函数中判断错误（不会继续向下传递）
       // 那么函数结束计数直接为 0，自动释放了
       std::shared_ptr<message<T>> msg = std::make_shared<message<T>>();
-      asio::async_read(socket, asio::buffer(&msg->header, sizeof(message_header<T>)), [self = this->shared_from_this(), msg](std::error_code ec, std::size_t length)
+      len_t header_size = msg->get_header_size();
+      std::shared_ptr<std::vector<byte_t>> header_buffer = std::make_shared<std::vector<byte_t>>(header_size);
+      asio::async_read(socket, asio::buffer(header_buffer->data(), header_size), [self = this->shared_from_this(), msg, header_buffer](std::error_code ec, std::size_t length)
                        {
         if (!ec) {
+          msg->set_header_from_buffer(*header_buffer);
+          // 有 body
           if (msg->header.size > 0)
-          {
-            // 有 body
-            msg->body.resize(msg->header.size);
             self->ReadBody(msg);
-          }
+          // 无 body
           else
-          {
-            // 无 body
             self->PushMessageToQueue(msg);
-          }
         } else {
           err("[%d] Read Header Failed", self->id);
           // 这里可以调用离线，这样不用发消息时才确定离线，读取 Header 失败，一定是离线导致吗？
@@ -136,7 +110,7 @@ namespace net
 
     void ReadBody(std::shared_ptr<message<T>> msg)
     {
-      asio::async_read(socket, asio::buffer(msg->body.data(), msg->body.size()), [self = this->shared_from_this(), msg](std::error_code ec, std::size_t length)
+      asio::async_read(socket, asio::buffer(msg->get_body_buffer().data(), msg->header.size), [self = this->shared_from_this(), msg](std::error_code ec, std::size_t length)
                        {
         if (!ec) {
           self->PushMessageToQueue(msg);
@@ -180,6 +154,7 @@ namespace net
 
     void ShutdownSend()
     {
+      std::unique_lock<std::mutex> lock(shutdown_mtx);
       if (has_shutdown_send)
         return;
       has_shutdown_send = true;
@@ -189,7 +164,7 @@ namespace net
 
     uint32_t GetID() const { return id; }
 
-    bool Send(const message<T> &msg, bool move = true)
+    bool Send(const message<T> &msg)
     {
       if (!IsConnected())
       {
@@ -198,15 +173,31 @@ namespace net
       }
       // 由于这里是异步，因此需要 copy，否则在异步回调执行中就拿不到引用了，如果外面不需要用了，这里可以 move
       // 当然你可以去写重载函数
-      asio::post(this->socket.get_executor(), [self = this->shared_from_this(), inner_msg = move ? std::move(const_cast<message<T> &>(msg)) : msg]() mutable
+      asio::post(this->socket.get_executor(), [self = this->shared_from_this(), inner_msg = msg]() mutable
                  {
                   bool isIdle = self->message_out_dq.empty();
                   // 往 out mesaage queue 添加要发送的消息，注意这里的 msg 是右值引用（左值），需要用 std::move 变成右值
-                  self->message_out_dq.emplace_back(std::move(inner_msg));
+                  self->message_out_dq.emplace_back(std::move(inner_msg.get_buffer()));
                   // 如果在添加消息之前，队列为空，说明此时是空闲的，因此需要唤起任务
                   // 否则，发送消息的任务已经启动了，不需要再次启动
                   if (isIdle)
-                    self->WriteHeader(); });
+                    self->Write(); });
+      return true;
+    };
+
+    bool Send(const byte_buffer &msg)
+    {
+      if (!IsConnected())
+      {
+        warn("[%d] Will Released! Can't send messages anymore", id);
+        return false;
+      }
+      asio::post(this->socket.get_executor(), [self = this->shared_from_this(), inner_msg = msg]() mutable
+                 {
+                  bool isIdle = self->message_out_dq.empty();
+                  self->message_out_dq.emplace_back(std::move(inner_msg));
+                  if (isIdle)
+                    self->Write(); });
       return true;
     };
 

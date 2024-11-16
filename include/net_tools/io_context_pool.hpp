@@ -24,11 +24,9 @@ public:
 
   void Stop()
   {
+    // work 释放后，如果没有异步任务了，io_context 也会释放
     for (unsigned int i = 0; i < size; i++)
-    {
-      // work 释放后，如果没有异步任务了，io_context 也会释放
       works[i].reset();
-    }
   };
 
   void Join()
@@ -46,11 +44,13 @@ public:
 
   void Start()
   {
+    ctxs = std::vector<asio::io_context>(size);
     threads.reserve(size);
+    works.reserve(size);
     for (unsigned int i = 0; i < size; i++)
     {
       // 由于是在子线程里面 run，必须确保始终存在一个 work
-      works[i] = std::make_unique<asio::io_context::work>(ctxs[i]);
+      works.emplace_back(std::make_unique<asio::io_context::work>(ctxs[i]));
       threads.emplace_back([this, i]()
                            { ctxs[i].run(); });
     }
@@ -62,6 +62,6 @@ private:
 
   int cur_idx = -1;
   std::vector<std::thread> threads;
-  std::vector<asio::io_context> ctxs{size};
-  std::vector<std::unique_ptr<asio::io_context::work>> works{size};
+  std::vector<asio::io_context> ctxs;
+  std::vector<std::unique_ptr<asio::io_context::work>> works;
 };
