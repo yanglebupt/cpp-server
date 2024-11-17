@@ -80,6 +80,7 @@ namespace net
     virtual ~server_interface()
     {
       Close();
+      logger::terminate();
       io_context_pool::Instance()->Join();
       if (t_log.joinable())
         t_log.join();
@@ -93,7 +94,9 @@ namespace net
       if (will_closed)
         return;
       will_closed = true;
+      ctx.stop();
       this->Exit();
+      warn("[SERVER] Logic Systerm Exited!");
       // 关闭全部连接
       for (auto item : m_connections)
       {
@@ -101,9 +104,7 @@ namespace net
         OnClientDisConnect(item.second);
       }
       m_connections.clear();
-      ctx.stop();
       io_context_pool::Instance()->Stop();
-      logger::terminate();
     }
 
     void Start()
@@ -112,7 +113,7 @@ namespace net
       {
         io_context_pool::Instance()->Start();
         // 监听退出信号，永远存在的一个 work，直到 exit
-        asio::signal_set exit_signals(ctx, SIGINT, SIGTERM);
+        asio::signal_set exit_signals(ctx, SIGINT, SIGTERM, SIGBREAK);
         exit_signals.async_wait([this](auto, auto)
                                 { Close(); });
         // 开启消息子线程

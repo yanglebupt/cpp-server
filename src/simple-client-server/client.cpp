@@ -58,7 +58,7 @@ int main()
   std::cout << "Press 2: Send Json Message to All Other Clients" << std::endl;
   std::cout << "Press 3: Exit" << std::endl;
 
-  CustomClient &c = (*new CustomClient(5));
+  CustomClient c(5);
   c.Connect("127.0.0.1", 5050);
 
   bool exit_flag = false;
@@ -79,9 +79,7 @@ int main()
     }
     if (command == '3')
     {
-      delete &c;
-      // exit_flag = true;
-      // c.Close();
+      c.Close();
     }
   };
 

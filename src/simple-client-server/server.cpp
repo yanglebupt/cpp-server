@@ -3,7 +3,6 @@
 #endif
 #include "net_common/net_server.hpp"
 #include "common.cpp"
-#include <iostream>
 
 class CustomServer : public net::server_interface<custom_header>
 {
@@ -47,27 +46,8 @@ protected:
 
 int main()
 {
-  CustomServer &server = (*new CustomServer(5050));
-
-  std::thread t([&server]()
-                {
-                  bool exit_flag = false;
-                  CMDInputListener cmd_input_listner;
-                  auto line_callback = [&](const std::string &line)
-                  {
-                    if (line == "exit")
-                    {
-                      delete &server;
-                    }
-                  };
-                  while (!exit_flag)
-                  {
-                    cmd_input_listner(line_callback, false);
-                  } });
-
+  CustomServer server(5050);
   server.Start();
-
-  t.join();
 
   return 0;
 }

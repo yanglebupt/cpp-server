@@ -1,0 +1,30 @@
+{
+  // Use IntelliSense to learn about possible attributes.
+  // Hover to view descriptions of existing attributes.
+  // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Client Debug",
+      "type": "cppdbg",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}\\build\\client\\GameNetworkClient.exe",
+      "MIMode": "gdb",
+      "externalConsole": true,
+      "miDebuggerPath": "F:\\MinGW-18.0\\bin\\gdb.exe",
+      "preLaunchTask": "Build"
+    },
+    {
+      "name": "Server Debug",
+      "type": "cppdbg",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "program": "${workspaceFolder}\\build\\client\\GameNetworkServer.exe",
+      "MIMode": "gdb",
+      "externalConsole": true,
+      "miDebuggerPath": "F:\\MinGW-18.0\\bin\\gdb.exe",
+      "preLaunchTask": "Build"
+    }
+  ]
+}

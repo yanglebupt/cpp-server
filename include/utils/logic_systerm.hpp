@@ -2,7 +2,6 @@
 
 #include "tsqueue.hpp"
 #include "owned_message_interface.hpp"
-#include "logger.hpp"
 #include <functional>
 #include <mutex>
 #include <thread>
@@ -62,7 +61,6 @@ public:
     // 等待剩余消息处理完毕
     if (message_thread.joinable())
       message_thread.join();
-    warn("[SERVER] Logic Systerm Exited!");
   }
 
   virtual ~logic_system() {};

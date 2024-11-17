@@ -39,40 +39,18 @@ struct cus_body : public serializable
   }
 };
 
-struct B
+struct A
 {
-  B()
-  {
-    std::cout << "B con" << std::endl;
-  }
-  ~B()
-  {
-    std::cout << "B de" << std::endl;
-  }
-};
-
-struct C
-{
-  C()
-  {
-    std::cout << "C con" << std::endl;
-  }
-  ~C()
-  {
-    std::cout << "C de" << std::endl;
-  }
-};
-
-struct A : C
-{
-  B b;
+  std::thread t;
   A()
   {
+    t = std::thread([]() {
+
+    });
     std::cout << "A con" << std::endl;
   }
   ~A()
   {
-    std::this_thread::sleep_for(std::chrono::seconds(3));
     std::cout << "A de" << std::endl;
   }
 };

@@ -14,12 +14,6 @@ namespace net
   {
     friend class client_connection<T>;
 
-  private:
-    bool will_stopped = false;
-    asio::ip::tcp::resolver::results_type endpoints;
-    std::thread t_log;
-    std::mutex stop_mtx;
-
   public:
     // 0 代表不进行重连
     int max_retries;
@@ -67,6 +61,10 @@ namespace net
         m_connection = std::make_shared<client_connection<T>>(this, asio::ip::tcp::socket(ctx), message_in_dq);
         m_connection->ConnectToServer(endpoints, max_retries, retry_wait_ms);
 
+        // 监听退出信号
+        exit_signals.async_wait([this](auto, auto)
+                                { Close(); });
+
         info("Start Connecting...");
 
         // 开始异步操作
@@ -113,8 +111,8 @@ namespace net
       if (will_stopped)
         return;
       will_stopped = true;
-      m_connection.reset();
       ctx.stop();
+      m_connection.reset();
       OnDisConnect();
     };
 
@@ -128,6 +126,13 @@ namespace net
     std::shared_ptr<client_connection<T>> m_connection;
     // incoming message queue from server, and client need handle message in this queue
     tsqueue<owned_message<T, client_connection<T>>> message_in_dq;
+
+  private:
+    bool will_stopped = false;
+    asio::ip::tcp::resolver::results_type endpoints;
+    std::thread t_log;
+    std::mutex stop_mtx;
+    asio::signal_set exit_signals = asio::signal_set(ctx, SIGINT, SIGTERM, SIGBREAK);
   };
 
 }
